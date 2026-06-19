@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>ZipKit browser lab</title>
+		<style>
+			:root {
+				color-scheme: light;
+				--bg: #f7f8fa;
+				--panel: #ffffff;
+				--ink: #15171a;
+				--muted: #667085;
+				--line: #d7dce3;
+				--accent: #087f5b;
+				--accent-weak: #dff7ed;
+				--danger: #b42318;
+			}
+
+			* { box-sizing: border-box; }
+			body {
+				margin: 0;
+				background: var(--bg);
+				color: var(--ink);
+				font: 14px/1.45 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+			}
+			main { max-width: 1180px; margin: 0 auto; padding: 28px; }
+			header { display: flex; justify-content: space-between; gap: 24px; align-items: flex-end; margin-bottom: 22px; }
+			h1 { margin: 0; font-size: 28px; letter-spacing: 0; }
+			p { margin: 6px 0 0; color: var(--muted); }
+			button, select, textarea, input {
+				font: inherit;
+			}
+			button, select {
+				border: 1px solid var(--line);
+				background: var(--panel);
+				color: var(--ink);
+				border-radius: 6px;
+				min-height: 36px;
+			}
+			button {
+				padding: 0 12px;
+				cursor: pointer;
+			}
+			button.primary {
+				background: var(--accent);
+				border-color: var(--accent);
+				color: #fff;
+				font-weight: 700;
+			}
+			button:disabled { opacity: 0.55; cursor: not-allowed; }
+			select { padding: 0 9px; }
+			label { display: block; font-weight: 700; margin-bottom: 6px; }
+			.grid { display: grid; grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.25fr); gap: 18px; align-items: start; }
+			.panel {
+				background: var(--panel);
+				border: 1px solid var(--line);
+				border-radius: 8px;
+				padding: 16px;
+			}
+			.stack { display: grid; gap: 14px; }
+			.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+			.scenarios { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+			.scenario {
+				text-align: left;
+				padding: 10px;
+				min-height: 72px;
+			}
+			.scenario.active {
+				border-color: var(--accent);
+				background: var(--accent-weak);
+			}
+			.scenario strong { display: block; margin-bottom: 4px; }
+			.scenario span { display: block; color: var(--muted); font-size: 12px; }
+			textarea {
+				width: 100%;
+				min-height: 230px;
+				resize: vertical;
+				border: 1px solid var(--line);
+				border-radius: 6px;
+				padding: 10px;
+				background: #fbfcfd;
+				color: var(--ink);
+				font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+				font-size: 12px;
+				line-height: 1.45;
+			}
+			.drop {
+				border: 1px dashed #98a2b3;
+				border-radius: 8px;
+				background: #fbfcfd;
+				padding: 14px;
+			}
+			.drop.drag {
+				border-color: var(--accent);
+				background: var(--accent-weak);
+			}
+			.drop input { width: 100%; }
+			.meta { color: var(--muted); font-size: 12px; }
+			.error { color: var(--danger); font-weight: 700; white-space: pre-wrap; }
+			.summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+			.metric {
+				border: 1px solid var(--line);
+				border-radius: 8px;
+				padding: 12px;
+				background: #fbfcfd;
+				min-height: 78px;
+			}
+			.metric span { display: block; color: var(--muted); font-size: 12px; }
+			.metric strong { display: block; margin-top: 6px; font-size: 18px; }
+			table { width: 100%; border-collapse: collapse; font-size: 13px; }
+			th, td { border-bottom: 1px solid var(--line); padding: 9px 8px; text-align: right; white-space: nowrap; }
+			th:first-child, td:first-child { text-align: left; }
+			th:nth-child(2), td:nth-child(2) { text-align: left; }
+			th { color: var(--muted); font-weight: 700; background: #fbfcfd; }
+			.codecs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px 10px; }
+			.codecs label { display: flex; gap: 7px; align-items: center; margin: 0; font-weight: 500; }
+			.badge {
+				display: inline-block;
+				border-radius: 999px;
+				padding: 1px 7px;
+				font-size: 11px;
+				font-weight: 700;
+				background: #eef2f6;
+				color: #475467;
+			}
+			.badge.zipkit { background: var(--accent-weak); color: var(--accent); }
+			.codec-group td {
+				font-weight: 700;
+				border-bottom: 2px solid var(--line);
+				padding: 6px 8px;
+			}
+
+			.delta { color: var(--muted); font-size: 12px; }
+			@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+			.loading td {
+				animation: pulse 1s ease-in-out infinite;
+				text-align: center;
+				padding: 40px 8px;
+			}
+			.loading td::before {
+				content: '';
+				display: inline-block;
+				width: 20px;
+				height: 20px;
+				border: 3px solid var(--line);
+				border-top-color: var(--accent);
+				border-radius: 50%;
+				animation: spin 0.7s linear infinite;
+				vertical-align: middle;
+				margin-right: 10px;
+			}
+			@keyframes spin { to { transform: rotate(360deg); } }
+			@media (max-width: 880px) {
+				main { padding: 18px; }
+				header, .grid { display: grid; grid-template-columns: 1fr; }
+				.scenarios, .summary, .codecs { grid-template-columns: 1fr; }
+				th, td { white-space: normal; }
+			}
+		</style>
+	</head>
+	<body>
+		<main>
+			<header>
+				<div>
+					<h1>ZipKit browser lab</h1>
+					<p>Compare real payloads across codecs, modes, and uploaded files using the local ZipKit build.</p>
+				</div>
+				<div class="row">
+					<label for="mode" style="margin: 0">Mode</label>
+					<select id="mode">
+						<option value="balanced" selected>balanced</option>
+						<option value="speed">speed</option>
+						<option value="ratio">ratio</option>
+					</select>
+					<label for="iterations" style="margin:0">Iterations</label>
+					<input id="iterations" type="number" min="1" max="10000" value="100" style="width:70px;text-align:center;border:1px solid var(--line);border-radius:6px;padding:0 6px;min-height:36px" />
+					<button id="run" class="primary">Run comparison</button>
+				</div>
+			</header>
+
+			<section class="grid">
+				<div class="panel stack">
+					<div>
+						<label>Scenarios</label>
+						<div id="scenarios" class="scenarios"></div>
+					</div>
+
+					<div id="editor-section">
+						<label for="input">Payload editor</label>
+						<textarea id="input" spellcheck="false"></textarea>
+						<div id="payload-meta" class="meta"></div>
+					</div>
+
+					<div id="upload-section" class="drop" style="display:none">
+						<label for="file">Upload file</label>
+						<input id="file" type="file" />
+						<div id="file-meta" class="meta">Select a file to use as the payload.</div>
+					</div>
+
+					<div>
+						<label>Codecs</label>
+						<div id="codecs" class="codecs"></div>
+					</div>
+
+					<div>
+						<label>Competitors</label>
+						<div class="row">
+							<label style="margin:0; font-weight:500; display:flex; gap:7px; align-items:center">
+								<input type="checkbox" id="include-competitors" checked>
+								Include competitor libraries
+							</label>
+						</div>
+					</div>
+				</div>
+
+				<div class="panel stack">
+					<div class="summary">
+						<div class="metric"><span>Input</span><strong id="input-size">-</strong></div>
+						<div class="metric"><span>Smallest output</span><strong id="best-ratio">-</strong></div>
+						<div class="metric"><span>Fastest compress</span><strong id="best-compress">-</strong></div>
+						<div class="metric"><span>Fastest decompress</span><strong id="best-decompress">-</strong></div>
+					</div>
+
+					<div>
+						<label>Results</label>
+						<table>
+							<thead>
+								<tr>
+									<th>Codec</th>
+									<th>Implementation</th>
+									<th>Size</th>
+									<th>Ratio</th>
+									<th>Compress</th>
+									<th>Decompress</th>
+									<th>OK</th>
+								</tr>
+							</thead>
+							<tbody id="results">
+								<tr><td colspan="7" style="text-align: left">Run a comparison to see results.</td></tr>
+							</tbody>
+						</table>
+					</div>
+					<div id="error" class="error"></div>
+				</div>
+			</section>
+		</main>
+
+		<script type="module">
+			if (location.protocol === 'file:') {
+				document.getElementById('run').disabled = true;
+				document.getElementById('error').textContent =
+					'Run this example through Vite instead of opening index.html directly:\n\n' +
+					'  cd examples/browser\n' +
+					'  bun install\n' +
+					'  bun run dev\n\n' +
+					'Browser modules and Wasm are blocked by CORS on file:// URLs.';
+			} else {
+				import('./main.ts');
+			}
+		</script>
+	</body>
+</html>

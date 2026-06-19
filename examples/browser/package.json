@@ -1,0 +1,22 @@
+{
+	"name": "zipkit-browser-example",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "vite",
+		"build": "vite build",
+		"preview": "vite preview"
+	},
+	"dependencies": {
+		"@bokuweb/zstd-wasm": "^0.0.27",
+		"brotli-wasm": "^3.0.1",
+		"fflate": "^0.8.3",
+		"lz4js": "^0.2.0",
+		"pako": "^2.1.0",
+		"snappyjs": "^0.7.0",
+		"zipkit": "file:../.."
+	},
+	"devDependencies": {
+		"vite": "^5.0.0"
+	}
+}

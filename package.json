@@ -1,0 +1,105 @@
+{
+  "name": "zipkit",
+  "version": "0.0.1",
+  "description": "Overkill compression for Node, Bun & the browser — nine codecs (gzip/deflate/zlib/zstd/lz4/snappy/brotli/lzma/bzip2) plus ZIP, in one tiny typed API over a single WebAssembly engine.",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./engine": {
+      "types": "./dist/engine.d.ts",
+      "import": "./dist/engine.js"
+    },
+    "./streams": {
+      "types": "./dist/streams/index.d.ts",
+      "import": "./dist/streams/index.js"
+    },
+    "./workers": {
+      "types": "./dist/workers/index.d.ts",
+      "import": "./dist/workers/index.js"
+    },
+    "./parallel": {
+      "types": "./dist/parallel/index.d.ts",
+      "import": "./dist/parallel/index.js"
+    },
+    "./zip": {
+      "types": "./dist/zip/index.d.ts",
+      "import": "./dist/zip/index.js"
+    },
+    "./middleware": {
+      "types": "./dist/middleware/index.d.ts",
+      "import": "./dist/middleware/index.js"
+    }
+  },
+  "types": "./dist/index.d.ts",
+  "main": "./dist/index.js",
+  "bin": {
+    "zipkit": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "engine/dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "sideEffects": false,
+  "scripts": {
+    "build:engine": "bash engine/build.sh",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "test": "bun test",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "bun run clean && bun run build"
+  },
+  "keywords": [
+    "compression",
+    "gzip",
+    "deflate",
+    "zlib",
+    "zstd",
+    "brotli",
+    "lz4",
+    "snappy",
+    "lzma",
+    "bzip2",
+    "zip",
+    "wasm",
+    "bun",
+    "browser",
+    "fflate-alternative",
+    "typescript"
+  ],
+  "author": "Myria Labs",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/myrialabs/zipkit.git"
+  },
+  "homepage": "https://github.com/myrialabs/zipkit#readme",
+  "bugs": {
+    "url": "https://github.com/myrialabs/zipkit/issues"
+  },
+  "devDependencies": {
+    "@bokuweb/zstd-wasm": "^0.0.27",
+    "@eslint/js": "^9.31.0",
+    "@types/bun": "latest",
+    "@types/node": "^22.10.0",
+    "brotli-wasm": "^3.0.1",
+    "eslint": "^9.31.0",
+    "fflate": "^0.8.3",
+    "globals": "^16.3.0",
+    "jszip": "^3.10.1",
+    "lz4js": "^0.2.0",
+    "pako": "^2.1.0",
+    "snappyjs": "^0.7.0",
+    "typescript": "^5.7.0",
+    "typescript-eslint": "^8.37.0"
+  }
+}

@@ -1,0 +1,27 @@
+node_modules/
+/dist/
+*.log
+.DS_Store
+.env
+.env.*.local
+bun.lockb
+*.tsbuildinfo
+*.tgz
+.cache
+coverage/
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+Thumbs.db
+
+# Emscripten intermediate build files (engine/dist/*.{mjs,wasm} are committed deliverables)
+engine/*.o
+engine/dist/*.map
+
+# Vendor sources are fetched by engine/vendor-download.sh; not committed
+engine/vendor/
+
+# Example build artifacts
+examples/browser/dist/
