@@ -20,7 +20,7 @@ Thumbs.db
 engine/*.o
 engine/dist/*.map
 
-# Vendor sources are fetched by engine/vendor-download.sh; not committed
+# Vendor sources are fetched by engine/vendor-download.sh; not committed.
 engine/vendor/
 
 # Example build artifacts

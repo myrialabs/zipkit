@@ -5,7 +5,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-[ -d vendor/libdeflate-1.22 ] || bash "$(dirname "$0")/vendor-download.sh"
+bash vendor-download.sh
 
 V=vendor
 LIBDEFLATE=$V/libdeflate-1.22
@@ -13,7 +13,7 @@ LZ4=$V/lz4-1.10.0
 ZSTD=$V/zstd-1.5.6
 BROTLI=$V/brotli-1.1.0
 SNAPPY=$V/snappy-1.2.1
-LZMA=$V/LZMA-SDK-18.05/C
+LZMA=$V/lzma-sdk
 BZIP2=$V/bzip2-1.0.8
 OUT=dist
 mkdir -p "$OUT"
