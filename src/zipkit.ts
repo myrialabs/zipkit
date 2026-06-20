@@ -2,8 +2,8 @@
  * ZipKit — the high-level, synchronous API with runtime-adaptive dispatch.
  *
  * Goal: keep the public API small while still taking the best path available:
- *   • gzip/deflate — balanced/speed may use native Bun zlib for small text-like
- *     inputs where call latency wins; ratio mode forces libdeflate density.
+ *   • gzip/deflate — balanced/speed always use native Bun zlib when available;
+ *     ratio mode forces libdeflate for denser output.
  *   • zlib — uses the libdeflate engine for standard zlib streams.
  *   • zstd — where Bun ships native libzstd (the speed ceiling), dispatch to
  *     native. In the browser / Node, fall back to the ZipKit Wasm engine.
@@ -19,7 +19,7 @@
  */
 
 import { ZipKitEngine } from './engine.js';
-import { compressionMode, levelForMode, likelyTextOrRepetitive } from './internal.js';
+import { compressionMode, levelForMode } from './internal.js';
 import { packSync, unpackSync } from './pack.js';
 import type { CompressOptions } from './types.js';
 
@@ -32,10 +32,9 @@ function optsFrom(levelOrOpts: SyncCompressOptions): CompressOptions | undefined
 	return typeof levelOrOpts === 'number' ? { level: levelOrOpts } : levelOrOpts;
 }
 
-function useNativeDeflateFamily(data: Uint8Array, opts: CompressOptions | undefined, method: 'gzip' | 'deflate'): boolean {
-	const mode = compressionMode(opts);
+function useNativeDeflateFamily(opts: CompressOptions | undefined, method: 'gzip' | 'deflate'): boolean {
 	const fn = method === 'gzip' ? B?.gzipSync : B?.deflateSync;
-	return mode !== 'ratio' && typeof fn === 'function' && data.length <= 1024 * 1024 && likelyTextOrRepetitive(data);
+	return compressionMode(opts) !== 'ratio' && typeof fn === 'function';
 }
 
 /** The codec used to compress the frame-delta residual (see {@link ZipKit.encodeFrames}). */
@@ -64,21 +63,21 @@ export class ZipKit {
 	gzip(d: Uint8Array, levelOrOpts?: SyncCompressOptions): Uint8Array {
 		const opts = optsFrom(levelOrOpts);
 		const level = levelForMode(opts, 0, 9, { speed: 1, balanced: 6, ratio: 9 });
-		if (useNativeDeflateFamily(d, opts, 'gzip')) return new Uint8Array(B.gzipSync(d, { level }));
+		if (useNativeDeflateFamily(opts, 'gzip')) return B.gzipSync(d, { level });
 		return this.engine.gzipCompress(d, level);
 	}
 	gunzip(d: Uint8Array): Uint8Array {
-		if (isBun && B?.gunzipSync) return new Uint8Array(B.gunzipSync(d));
+		if (isBun && B?.gunzipSync) return B.gunzipSync(d);
 		return this.engine.gzipDecompress(d);
 	}
 	deflate(d: Uint8Array, levelOrOpts?: SyncCompressOptions): Uint8Array {
 		const opts = optsFrom(levelOrOpts);
 		const level = levelForMode(opts, 0, 9, { speed: 1, balanced: 6, ratio: 9 });
-		if (useNativeDeflateFamily(d, opts, 'deflate')) return new Uint8Array(B.deflateSync(d, { level }));
+		if (useNativeDeflateFamily(opts, 'deflate')) return B.deflateSync(d, { level });
 		return this.engine.deflateCompress(d, level);
 	}
 	inflate(d: Uint8Array): Uint8Array {
-		if (isBun && B?.inflateSync) return new Uint8Array(B.inflateSync(d));
+		if (isBun && B?.inflateSync) return B.inflateSync(d);
 		return this.engine.deflateDecompress(d);
 	}
 	zlib(d: Uint8Array, levelOrOpts?: SyncCompressOptions): Uint8Array {

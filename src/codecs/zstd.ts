@@ -8,7 +8,7 @@ export async function zstd(data: Uint8Array, opts?: CompressOptions): Promise<Ui
 	const level = levelForMode(opts, 1, 22, { speed: 1, balanced: 3, ratio: 19 });
 	const bun = bunRuntime();
 	if (bun?.zstdCompressSync) {
-		return runAsync(() => new Uint8Array(bun.zstdCompressSync(data, { level })), opts, data.length);
+		return runAsync(() => bun.zstdCompressSync(data, { level }), opts, data.length);
 	}
 	const e = await getEngine();
 	// Levels above 19 enable zstd's "ultra" mode plus long-distance matching.
@@ -19,7 +19,7 @@ export async function zstd(data: Uint8Array, opts?: CompressOptions): Promise<Ui
 /** Decompress a Zstandard frame. */
 export async function unzstd(data: Uint8Array, opts?: DecompressOptions): Promise<Uint8Array> {
 	const bun = bunRuntime();
-	if (bun?.zstdDecompressSync) return runAsync(() => new Uint8Array(bun.zstdDecompressSync(data)), opts, data.length);
+	if (bun?.zstdDecompressSync) return runAsync(() => bun.zstdDecompressSync(data), opts, data.length);
 	const e = await getEngine();
 	return runAsync(() => e.zstdDecompress(data), opts, data.length);
 }

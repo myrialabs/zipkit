@@ -30,28 +30,6 @@ export function bunRuntime(): any | undefined {
 	return (globalThis as { Bun?: any }).Bun;
 }
 
-/**
- * Cheap content signal for Bun's native zlib path. Native zlib is very fast on
- * small textual/repetitive inputs, while libdeflate usually wins on high-entropy
- * binary and on ratio.
- */
-export function likelyTextOrRepetitive(data: Uint8Array): boolean {
-	const len = Math.min(data.length, 4096);
-	if (len === 0) return true;
-	const seen = new Uint8Array(256);
-	let distinct = 0;
-	let printable = 0;
-	for (let i = 0; i < len; i++) {
-		const b = data[i]!;
-		if (seen[b] === 0) {
-			seen[b] = 1;
-			distinct++;
-		}
-		if (b === 9 || b === 10 || b === 13 || (b >= 32 && b <= 126)) printable++;
-	}
-	return distinct <= 128 || printable / len >= 0.9;
-}
-
 /** Throw {@link AbortError} if the signal is already aborted. */
 export function throwIfAborted(signal?: AbortSignal): void {
 	if (signal?.aborted) throw new AbortError();

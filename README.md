@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="https://tunnelkit.myrialabs.dev/favicon.svg" alt="ZipKit" width="72" height="72" />
+</p>
+
 <h1 align="center">ZipKit</h1>
 
 <p align="center">
@@ -7,6 +11,7 @@
 </p>
 
 <p align="center">
+  <a href="https://demo.zipkit.myrialabs.dev/">Demo</a> ·
   <a href="https://www.npmjs.com/package/zipkit">npm</a> ·
   <a href="./docs/api.md">API reference</a> ·
   <a href="./docs/cli.md">CLI reference</a> ·
@@ -115,7 +120,7 @@ const smallest = zk.pack(bytes); // tries brotli/lzma/bzip2/zstd-max, keeps the 
 
 ## Performance
 
-Bun 1.3 / Apple M2, every codec against its best competitor. Reproduce with
+Bun 1.3.14, every codec against its best competitor. Reproduce with
 `bun run bench.ts`; the full tables (three datasets + parallel + ZIP archive vs
 JSZip/fflate) live in [bench-results.md](./bench-results.md). All roundtrips are
 byte-identical.
@@ -125,38 +130,38 @@ Representative — **E-commerce API**, ~97 KB JSON (throughput, higher is faster
 | Codec | Implementation | Ratio | Compress | Decompress |
 |-------|----------------|------:|---------:|-----------:|
 | **gzip** | | | | |
-| | ZipKit | 5.1% | 365 MB/s | 1.8 GB/s |
-| | ZipKit (ratio) | 4.9% | 50 MB/s | 2.0 GB/s |
-| | fflate | 5.9% | 53 MB/s | 118 MB/s |
-| | Bun.gzipSync | 5.1% | 386 MB/s | 2.6 GB/s |
+| | ZipKit | 5.1% | 391 MB/s | 2.4 GB/s |
+| | ZipKit (ratio) | 4.9% | 51 MB/s | 2.4 GB/s |
+| | fflate | 5.9% | 54 MB/s | 121 MB/s |
+| | Bun.gzipSync | 5.1% | 395 MB/s | 2.6 GB/s |
 | **deflate** | | | | |
-| | ZipKit | 5.1% | 379 MB/s | 1.9 GB/s |
-| | ZipKit (ratio) | 4.9% | 52 MB/s | 1.9 GB/s |
-| | fflate | 5.9% | 65 MB/s | 118 MB/s |
-| | Bun.deflateSync | 5.1% | 407 MB/s | 2.8 GB/s |
+| | ZipKit | 5.1% | 409 MB/s | 2.5 GB/s |
+| | ZipKit (ratio) | 4.9% | 53 MB/s | 2.5 GB/s |
+| | fflate | 5.9% | 66 MB/s | 118 MB/s |
+| | Bun.deflateSync | 5.1% | 408 MB/s | 2.9 GB/s |
 | **zlib** | | | | |
-| | ZipKit | 6.0% | 256 MB/s | 1.2 GB/s |
-| | ZipKit (ratio) | 4.9% | 52 MB/s | 1.9 GB/s |
-| | fflate | 5.9% | 66 MB/s | 116 MB/s |
+| | ZipKit | 6.0% | 262 MB/s | 1.2 GB/s |
+| | ZipKit (ratio) | 4.9% | 53 MB/s | 2.0 GB/s |
+| | fflate | 5.9% | 67 MB/s | 117 MB/s |
 | **zstd** | | | | |
-| | ZipKit | 5.6% | 1.5 GB/s | 3.4 GB/s |
-| | ZipKit (ratio) | 3.9% | 2 MB/s | 4.3 GB/s |
-| | zstd-wasm | 5.6% | 346 MB/s | 880 MB/s |
-| | Bun.zstdCompressSync | 5.6% | 1.9 GB/s | 3.3 GB/s |
+| | ZipKit | 5.6% | 1.6 GB/s | 3.5 GB/s |
+| | ZipKit (ratio) | 3.9% | 2 MB/s | 4.7 GB/s |
+| | zstd-wasm | 5.6% | 354 MB/s | 970 MB/s |
+| | Bun.zstdCompressSync | 5.6% | 1.9 GB/s | 3.5 GB/s |
 | **lz4** | | | | |
-| | ZipKit | 12.9% | 1010 MB/s | 1.4 GB/s |
-| | lz4js | 12.5% | 333 MB/s | 481 MB/s |
+| | ZipKit | 12.9% | 1022 MB/s | 2.1 GB/s |
+| | lz4js | 12.5% | 402 MB/s | 492 MB/s |
 | **snappy** | | | | |
-| | ZipKit | 13.5% | 566 MB/s | 1.5 GB/s |
-| | snappyjs | 13.5% | 340 MB/s | 430 MB/s |
+| | ZipKit | 13.5% | 575 MB/s | 1.5 GB/s |
+| | snappyjs | 13.5% | 357 MB/s | 440 MB/s |
 | **brotli** | | | | |
-| | ZipKit | 4.1% | 102 MB/s | 947 MB/s |
-| | ZipKit (ratio) | 3.4% | 592.7 KB/s | 1.7 GB/s |
-| | brotli-wasm | 4.1% | 41 MB/s | 569 MB/s |
+| | ZipKit | 4.1% | 108 MB/s | 969 MB/s |
+| | ZipKit (ratio) | 3.4% | 613.1 KB/s | 1.8 GB/s |
+| | brotli-wasm | 4.1% | 43 MB/s | 600 MB/s |
 | **lzma** | | | | |
-| | ZipKit | 3.8% | 17 MB/s | 393 MB/s |
+| | ZipKit | 3.8% | 18 MB/s | 395 MB/s |
 | **bzip2** | | | | |
-| | ZipKit | 3.4% | 16 MB/s | 77 MB/s |
+| | ZipKit | 3.4% | 17 MB/s | 83 MB/s |
 
 What the full run adds beyond this table:
 
@@ -165,9 +170,9 @@ What the full run adds beyond this table:
 - **`mode: 'ratio'`** trades speed for size: libdeflate gzip/deflate is denser
   than native zlib, and brotli/lzma/bzip2 reach the smallest output (~3.3–3.8% on JSON).
 - **Parallel** (8 cores, 34 MB logs) is the multi-core path native libs lack:
-  `compressParallel` gzip runs **3.7× faster** than `Bun.gzipSync`, 6% denser.
+  `compressParallel` gzip runs **5.1× faster** than `Bun.gzipSync`, same output size.
 - **ZIP archives** fan entry compression across the pool: a 20-file, 8 MB archive
-  packs **8.5× faster** than `fflate` and **7.7× faster** than JSZip, 10% smaller.
+  packs **8.5× faster** than `fflate` and **7.5× faster** than JSZip, 10% smaller.
 
 ## Streaming
 
@@ -253,6 +258,18 @@ roadmap.
 - [Algorithms](./docs/algorithms.md) — which codec to use, with benchmark tables.
 - [Streaming](./docs/streaming.md) · [ZIP](./docs/zip.md) · [Browser](./docs/browser.md)
 - [Examples](./examples/README.md) — runnable scenarios.
+
+## Support
+
+If ZipKit is useful to you, consider supporting its development:
+
+| Method | Address / Link |
+|--------|----------------|
+| Bitcoin (BTC) | `bc1qd9fyx4r84cce2a9hkjksetah802knadw5msls3` |
+| Solana (SOL) | `Ev3P4KLF1PNC5C9rZYP8M3DdssyBQAQAiNJkvNmPQPVs` |
+| Ethereum (ERC-20) | `0x61D826e5b666AA5345302EEEd485Acca39b1AFCF` |
+| USDT (TRC-20) | `TLH49i3EoVKhFyLb6u2JUXZWScK7uzksdC` |
+| Saweria | [saweria.co/myrialabs](https://saweria.co/myrialabs) |
 
 ## License
 

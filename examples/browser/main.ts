@@ -268,7 +268,7 @@ function resetResultsIfConfigChanged(): void {
 	const modeVal = mode.value;
 	const iterVal = iterationsInput.value;
 	if (activeScenario.id !== lastScenarioId || modeVal !== lastMode || iterVal !== lastIterations) {
-		resultsBody.innerHTML = '<tr><td colspan="7" style="text-align:left">Run a comparison to see results.</td></tr>';
+		resultsBody.innerHTML = '<tr class="empty-row"><td colspan="7"><div class="empty-state"><div class="empty-state-text">Run a comparison to see results.</div></div></td></tr>';
 		bestCompress.textContent = '-';
 		bestDecompress.textContent = '-';
 		bestRatio.textContent = '-';
@@ -328,11 +328,17 @@ function updatePayloadMeta(): void {
 	}
 }
 
+function showError(msg: string): void {
+	errorBox.textContent = msg;
+	errorBox.style.display = msg ? '' : 'none';
+}
+
 function setScenario(scenario: Scenario): void {
 	activeScenario = scenario;
 	uploaded = undefined;
 	generatedPayload = undefined;
 	file.value = '';
+	showError('');
 	const isUpload = scenario.id === 'upload';
 	const isGenerated = !!scenario.generate;
 	editorSection.style.display = isUpload || isGenerated ? 'none' : '';
@@ -342,7 +348,7 @@ function setScenario(scenario: Scenario): void {
 			generatedPayload = scenario.generate!();
 		} catch (err) {
 			generatedPayload = undefined;
-			errorBox.textContent = err instanceof Error ? err.message : String(err);
+			showError(err instanceof Error ? err.message : String(err));
 			return;
 		}
 		input.value = `[generated: ${formatBytes(generatedPayload.length)}]`;
@@ -365,7 +371,7 @@ function renderScenarios(): void {
 		button.type = 'button';
 		button.className = 'scenario';
 		button.dataset.id = scenario.id;
-		button.innerHTML = `<strong>${scenario.name}</strong><span>${scenario.description}</span>`;
+		button.innerHTML = `<div class="scenario-header"><strong>${scenario.name}</strong></div><span>${scenario.description}</span>`;
 		button.addEventListener('click', () => setScenario(scenario));
 		scenarioList.append(button);
 	}
@@ -505,14 +511,18 @@ async function readFile(selected: File | undefined): Promise<void> {
 function setBusy(isBusy: boolean): void {
 	run.disabled = isBusy;
 	run.textContent = isBusy ? 'Running...' : 'Run comparison';
+	if (isBusy) {
+		bestRatio.textContent = '…';
+		bestCompress.textContent = '…';
+		bestDecompress.textContent = '…';
+	}
 }
 
-function renderResults(results: Result[], dataLength: number): void {
+function renderSummary(results: Result[], dataLength: number): void {
 	const okResults = results.filter((r) => r.ok);
-	const fastest = okResults.reduce<Result | undefined>((best, r) => !best || r.ms < best.ms ? r : best, undefined);
-	const smallest = okResults.reduce<Result | undefined>((best, r) => !best || r.bytes < best.bytes ? r : best, undefined);
 	const compressChamp = okResults.reduce<Result | undefined>((best, r) => !best || r.compressMs < best.compressMs ? r : best, undefined);
 	const decompressChamp = okResults.reduce<Result | undefined>((best, r) => !best || r.decompressMs < best.decompressMs ? r : best, undefined);
+	const smallest = okResults.reduce<Result | undefined>((best, r) => !best || r.bytes < best.bytes ? r : best, undefined);
 
 	bestCompress.textContent = compressChamp
 		? `${compressChamp.implementation} (${compressChamp.codec}) · ${formatThroughput(dataLength, compressChamp.compressMs)}`
@@ -521,6 +531,12 @@ function renderResults(results: Result[], dataLength: number): void {
 		? `${decompressChamp.implementation} (${decompressChamp.codec}) · ${formatThroughput(dataLength, decompressChamp.decompressMs)}`
 		: '-';
 	bestRatio.textContent = smallest ? `${smallest.implementation} (${smallest.codec}) · ${(smallest.ratio * 100).toFixed(1)}%` : '-';
+}
+
+function renderResults(results: Result[], dataLength: number): void {
+	const okResults = results.filter((r) => r.ok);
+	const fastest = okResults.reduce<Result | undefined>((best, r) => !best || r.ms < best.ms ? r : best, undefined);
+	const smallest = okResults.reduce<Result | undefined>((best, r) => !best || r.bytes < best.bytes ? r : best, undefined);
 
 	const grouped = new Map<string, Result[]>();
 	for (const result of results) {
@@ -542,9 +558,9 @@ function renderResults(results: Result[], dataLength: number): void {
 		for (const result of group) {
 			const tr = document.createElement('tr');
 			const globalBest = result === fastest
-				? '<span class="badge" style="background:#fef9c3;color:#854d0e">fastest</span>'
+				? '<span class="badge badge-fastest">&#9889; fastest</span>'
 				: result === smallest
-					? '<span class="badge" style="background:#e6f4ff;color:#175cd3">smallest</span>'
+					? '<span class="badge badge-smallest">&#9660; smallest</span>'
 					: '';
 
 			if (result.ok) {
@@ -553,9 +569,9 @@ function renderResults(results: Result[], dataLength: number): void {
 					+ `<td>${(result.ratio * 100).toFixed(1)}%</td>`
 					+ `<td>${formatThroughput(dataLength, result.compressMs)}</td>`
 					+ `<td>${formatThroughput(dataLength, result.decompressMs)}</td>`
-					+ `<td>ok</td>`;
+					+ `<td><span class="ok">ok</span></td>`;
 			} else {
-				tr.innerHTML = `<td></td><td>${result.implementation}</td><td colspan="5" style="text-align:left">${result.error ?? 'failed'}</td>`;
+				tr.innerHTML = `<td></td><td>${result.implementation}</td><td colspan="5" style="text-align:left"><span class="fail">${result.error ?? 'failed'}</span></td>`;
 			}
 			resultsBody.append(tr);
 		}
@@ -565,20 +581,23 @@ function renderResults(results: Result[], dataLength: number): void {
 
 
 async function runComparison(): Promise<void> {
-	errorBox.textContent = '';
+	showError('');
 	if (activeScenario.id === 'upload' && !uploaded) {
-		errorBox.textContent = 'Select a file first.';
+		showError('Select a file first.');
 		return;
 	}
 	const data = currentPayload();
 	const chosen = selectedCodecs();
 	if (chosen.length === 0) {
-		errorBox.textContent = 'Select at least one codec.';
+		showError('Select at least one codec.');
 		return;
 	}
 	const includeCompetitors = includeCompetitorsCheck.checked;
 	const iters = Math.max(1, parseInt(iterationsInput.value, 10) || 1);
 	setBusy(true);
+	if (window.innerWidth <= 880) {
+		document.getElementById('results-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+	}
 	const label = iters > 1 ? `Running ${iters}× per candidate…` : 'Compressing…';
 	resultsBody.innerHTML = `<tr class="loading"><td colspan="7">${label}</td></tr>`;
 	await new Promise((r) => requestAnimationFrame(r));
@@ -643,6 +662,7 @@ async function runComparison(): Promise<void> {
 	}
 	// remove loading row once fully done
 	resultsBody.querySelector('.loading')?.remove();
+	renderSummary(rows, data.length);
 	lastScenarioId = activeScenario.id;
 	lastMode = mode.value;
 	lastIterations = iterationsInput.value;

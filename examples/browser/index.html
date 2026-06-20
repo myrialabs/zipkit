@@ -3,183 +3,634 @@
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
-		<title>ZipKit browser lab</title>
+		<title>ZipKit Browser Lab</title>
 		<style>
 			:root {
-				color-scheme: light;
-				--bg: #f7f8fa;
-				--panel: #ffffff;
-				--ink: #15171a;
-				--muted: #667085;
-				--line: #d7dce3;
-				--accent: #087f5b;
-				--accent-weak: #dff7ed;
-				--danger: #b42318;
+				color-scheme: light dark;
+				--bg: #f5f6f8;
+				--surface: #ffffff;
+				--surface-raised: #fafbfc;
+				--ink: #111827;
+				--ink-secondary: #6b7280;
+				--border: #e5e7eb;
+				--border-strong: #d1d5db;
+				--accent: #059669;
+				--accent-hover: #047857;
+				--accent-light: #d1fae5;
+				--accent-subtle: #ecfdf5;
+				--danger: #dc2626;
+				--danger-light: #fef2f2;
+				--warning: #d97706;
+				--warning-light: #fffbeb;
+				--info: #2563eb;
+				--info-light: #eff6ff;
+				--radius: 10px;
+				--radius-sm: 6px;
+				--radius-lg: 14px;
+				--shadow-xs: 0 1px 2px rgba(0,0,0,.04);
+				--shadow-sm: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+				--shadow-md: 0 4px 6px -1px rgba(0,0,0,.07), 0 2px 4px -2px rgba(0,0,0,.05);
+				--shadow-lg: 0 10px 15px -3px rgba(0,0,0,.08), 0 4px 6px -4px rgba(0,0,0,.04);
+				--font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, "Helvetica Neue", Arial, sans-serif;
+				--font-mono: "SF Mono", "Cascadia Code", "Fira Code", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 			}
 
-			* { box-sizing: border-box; }
+			@media (prefers-color-scheme: dark) {
+				:root {
+					--bg: #0f1117;
+					--surface: #1a1d27;
+					--surface-raised: #22252f;
+					--ink: #f3f4f6;
+					--ink-secondary: #9ca3af;
+					--border: #2d3140;
+					--border-strong: #3b4054;
+					--accent: #34d399;
+					--accent-hover: #6ee7b7;
+					--accent-light: #064e3b;
+					--accent-subtle: #022c22;
+					--danger: #f87171;
+					--danger-light: #450a0a;
+					--warning: #fbbf24;
+					--warning-light: #451a03;
+					--info: #60a5fa;
+					--info-light: #1e3a5f;
+					--shadow-xs: 0 1px 2px rgba(0,0,0,.2);
+					--shadow-sm: 0 1px 3px rgba(0,0,0,.3);
+					--shadow-md: 0 4px 6px rgba(0,0,0,.3);
+					--shadow-lg: 0 10px 15px rgba(0,0,0,.4);
+				}
+			}
+
+			*, *::before, *::after { box-sizing: border-box; }
+			html { overflow-x: hidden; }
 			body {
 				margin: 0;
 				background: var(--bg);
 				color: var(--ink);
-				font: 14px/1.45 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+				font-family: var(--font-sans);
+				font-size: 14px;
+				line-height: 1.5;
+				-webkit-font-smoothing: antialiased;
+				-moz-osx-font-smoothing: grayscale;
+				overflow-x: hidden;
+				min-width: 0;
 			}
-			main { max-width: 1180px; margin: 0 auto; padding: 28px; }
-			header { display: flex; justify-content: space-between; gap: 24px; align-items: flex-end; margin-bottom: 22px; }
-			h1 { margin: 0; font-size: 28px; letter-spacing: 0; }
-			p { margin: 6px 0 0; color: var(--muted); }
-			button, select, textarea, input {
+
+			.container {
+				max-width: 1280px;
+				margin: 0 auto;
+				padding: 32px 24px;
+				min-width: 0;
+			}
+
+			/* ── Header ── */
+			.header {
+				display: flex;
+				justify-content: space-between;
+				align-items: flex-end;
+				gap: 20px;
+				margin-bottom: 28px;
+				padding-bottom: 20px;
+				border-bottom: 1px solid var(--border);
+				min-width: 0;
+				overflow: hidden;
+			}
+			.header-brand {
+				display: flex;
+				align-items: center;
+				gap: 12px;
+				min-width: 0;
+			}
+			.header-text {
+				min-width: 0;
+			}
+			.header-text h1 {
+				margin: 0;
+				font-size: 24px;
+				font-weight: 700;
+				letter-spacing: -0.02em;
+				line-height: 1.2;
+				overflow: hidden;
+				text-overflow: ellipsis;
+				white-space: nowrap;
+			}
+			.header-text p {
+				margin: 4px 0 0;
+				color: var(--ink-secondary);
+				font-size: 13px;
+				overflow: hidden;
+				text-overflow: ellipsis;
+				white-space: nowrap;
+			}
+			.header-controls {
+				display: flex;
+				align-items: center;
+				gap: 10px;
+				flex-shrink: 0;
+				flex-wrap: wrap;
+			}
+
+			/* ── Form Controls ── */
+			label {
+				display: block;
+				font-weight: 600;
+				font-size: 12px;
+				text-transform: uppercase;
+				letter-spacing: 0.04em;
+				color: var(--ink-secondary);
+				margin-bottom: 6px;
+			}
+			select, input[type="number"] {
 				font: inherit;
-			}
-			button, select {
-				border: 1px solid var(--line);
-				background: var(--panel);
+				border: 1px solid var(--border);
+				background: var(--surface);
 				color: var(--ink);
-				border-radius: 6px;
-				min-height: 36px;
+				border-radius: var(--radius-sm);
+				min-height: 38px;
+				padding: 0 10px;
+				outline: none;
+				transition: border-color .15s, box-shadow .15s;
+				max-width: 100%;
+				min-width: 0;
+				text-overflow: ellipsis;
+			}
+			select:focus, input[type="number"]:focus {
+				border-color: var(--accent);
+				box-shadow: 0 0 0 3px var(--accent-light);
+			}
+			input[type="number"] {
+				width: 72px;
+				text-align: center;
 			}
 			button {
-				padding: 0 12px;
+				font: inherit;
+				border: 1px solid var(--border);
+				background: var(--surface);
+				color: var(--ink);
+				border-radius: var(--radius-sm);
+				min-height: 38px;
+				padding: 0 16px;
 				cursor: pointer;
+				font-weight: 600;
+				transition: all .15s;
 			}
-			button.primary {
-				background: var(--accent);
-				border-color: var(--accent);
+			button:hover {
+				background: var(--surface-raised);
+				border-color: var(--border-strong);
+			}
+			button:disabled {
+				opacity: .5;
+				cursor: not-allowed;
+			}
+			button:disabled:hover {
+				background: var(--surface);
+				border-color: var(--border);
+			}
+			.btn-primary {
+				background: #047857;
+				border-color: #047857;
 				color: #fff;
-				font-weight: 700;
+				box-shadow: 0 1px 3px rgba(4,120,87,.3);
 			}
-			button:disabled { opacity: 0.55; cursor: not-allowed; }
-			select { padding: 0 9px; }
-			label { display: block; font-weight: 700; margin-bottom: 6px; }
-			.grid { display: grid; grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.25fr); gap: 18px; align-items: start; }
+			.btn-primary:hover:not(:disabled) {
+				background: #065f46;
+				border-color: #065f46;
+				box-shadow: 0 2px 8px rgba(4,120,87,.4);
+			}
+
+			/* ── Grid Layout ── */
+			.layout {
+				display: grid;
+				grid-template-columns: 1fr 1.4fr;
+				gap: 24px;
+				align-items: start;
+				min-width: 0;
+			}
+
+			/* ── Panels ── */
 			.panel {
-				background: var(--panel);
-				border: 1px solid var(--line);
-				border-radius: 8px;
-				padding: 16px;
+				background: var(--surface);
+				border: 1px solid var(--border);
+				border-radius: var(--radius-lg);
+				padding: 20px;
+				box-shadow: var(--shadow-sm);
+				min-width: 0;
+				overflow: auto;
 			}
-			.stack { display: grid; gap: 14px; }
-			.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-			.scenarios { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+			.stack {
+				display: grid;
+				gap: 20px;
+			}
+
+			/* ── Scenario Cards ── */
+			.scenarios {
+				display: grid;
+				grid-template-columns: repeat(2, 1fr);
+				gap: 8px;
+			}
 			.scenario {
 				text-align: left;
-				padding: 10px;
-				min-height: 72px;
+				padding: 12px;
+				min-height: 76px;
+				border: 1px solid var(--border);
+				border-radius: var(--radius);
+				background: var(--surface);
+				cursor: pointer;
+				transition: all .15s;
+			}
+			.scenario:hover {
+				border-color: var(--border-strong);
+				box-shadow: var(--shadow-xs);
 			}
 			.scenario.active {
 				border-color: var(--accent);
-				background: var(--accent-weak);
+				background: var(--accent-subtle);
+				box-shadow: 0 0 0 3px var(--accent-light);
 			}
-			.scenario strong { display: block; margin-bottom: 4px; }
-			.scenario span { display: block; color: var(--muted); font-size: 12px; }
-			textarea {
-				width: 100%;
-				min-height: 230px;
-				resize: vertical;
-				border: 1px solid var(--line);
-				border-radius: 6px;
-				padding: 10px;
-				background: #fbfcfd;
+			.scenario-header {
+				display: flex;
+				align-items: center;
+				gap: 8px;
+				margin-bottom: 4px;
+			}
+			.scenario strong {
+				display: block;
+				font-size: 13px;
+				font-weight: 600;
 				color: var(--ink);
-				font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-				font-size: 12px;
-				line-height: 1.45;
 			}
-			.drop {
-				border: 1px dashed #98a2b3;
-				border-radius: 8px;
-				background: #fbfcfd;
-				padding: 14px;
-			}
-			.drop.drag {
-				border-color: var(--accent);
-				background: var(--accent-weak);
-			}
-			.drop input { width: 100%; }
-			.meta { color: var(--muted); font-size: 12px; }
-			.error { color: var(--danger); font-weight: 700; white-space: pre-wrap; }
-			.summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
-			.metric {
-				border: 1px solid var(--line);
-				border-radius: 8px;
-				padding: 12px;
-				background: #fbfcfd;
-				min-height: 78px;
-			}
-			.metric span { display: block; color: var(--muted); font-size: 12px; }
-			.metric strong { display: block; margin-top: 6px; font-size: 18px; }
-			table { width: 100%; border-collapse: collapse; font-size: 13px; }
-			th, td { border-bottom: 1px solid var(--line); padding: 9px 8px; text-align: right; white-space: nowrap; }
-			th:first-child, td:first-child { text-align: left; }
-			th:nth-child(2), td:nth-child(2) { text-align: left; }
-			th { color: var(--muted); font-weight: 700; background: #fbfcfd; }
-			.codecs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px 10px; }
-			.codecs label { display: flex; gap: 7px; align-items: center; margin: 0; font-weight: 500; }
-			.badge {
-				display: inline-block;
-				border-radius: 999px;
-				padding: 1px 7px;
+			.scenario span {
+				display: block;
+				color: var(--ink-secondary);
 				font-size: 11px;
-				font-weight: 700;
-				background: #eef2f6;
-				color: #475467;
-			}
-			.badge.zipkit { background: var(--accent-weak); color: var(--accent); }
-			.codec-group td {
-				font-weight: 700;
-				border-bottom: 2px solid var(--line);
-				padding: 6px 8px;
+				line-height: 1.4;
 			}
 
-			.delta { color: var(--muted); font-size: 12px; }
-			@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
-			.loading td {
-				animation: pulse 1s ease-in-out infinite;
+			/* ── Textarea ── */
+			textarea {
+				width: 100%;
+				min-height: 200px;
+				resize: vertical;
+				border: 1px solid var(--border);
+				border-radius: var(--radius);
+				padding: 12px;
+				background: var(--surface-raised);
+				color: var(--ink);
+				font-family: var(--font-mono);
+				font-size: 12px;
+				line-height: 1.5;
+				outline: none;
+				transition: border-color .15s, box-shadow .15s;
+				max-width: 100%;
+			}
+			textarea:focus {
+				border-color: var(--accent);
+				box-shadow: 0 0 0 3px var(--accent-light);
+			}
+
+			/* ── Upload Drop Zone ── */
+			.drop-zone {
+				border: 2px dashed var(--border-strong);
+				border-radius: var(--radius);
+				background: var(--surface-raised);
+				padding: 24px;
 				text-align: center;
-				padding: 40px 8px;
+				transition: all .2s;
+				cursor: pointer;
+				min-width: 0;
+				overflow: hidden;
+			}
+			.drop-zone:hover, .drop-zone.drag {
+				border-color: var(--accent);
+				background: var(--accent-subtle);
+			}
+			.drop-zone-text {
+				color: var(--ink-secondary);
+				font-size: 13px;
+			}
+			.drop-zone-text strong {
+				color: var(--accent);
+			}
+			.drop-zone input[type="file"] {
+				width: 100%;
+				margin-top: 8px;
+			}
+
+			/* ── Codecs Grid ── */
+			.codecs {
+				display: grid;
+				grid-template-columns: repeat(3, 1fr);
+				gap: 4px;
+			}
+			.codecs label {
+				display: flex;
+				gap: 6px;
+				align-items: center;
+				margin: 0;
+				font-weight: 500;
+				font-size: 13px;
+				text-transform: none;
+				letter-spacing: 0;
+				color: var(--ink);
+				padding: 6px 8px;
+				border-radius: var(--radius-sm);
+				transition: background .1s;
+				cursor: pointer;
+			}
+			.codecs label:hover {
+				background: var(--surface-raised);
+			}
+			.codecs input[type="checkbox"] {
+				accent-color: var(--accent);
+				width: 15px;
+				height: 15px;
+			}
+
+			/* ── Competitors Toggle ── */
+			.toggle-row {
+				display: flex;
+				align-items: center;
+				gap: 8px;
+			}
+			.toggle-row label {
+				margin: 0;
+				font-weight: 500;
+				font-size: 13px;
+				text-transform: none;
+				letter-spacing: 0;
+				color: var(--ink);
+				cursor: pointer;
+			}
+			.toggle-row input[type="checkbox"] {
+				accent-color: var(--accent);
+				width: 16px;
+				height: 16px;
+			}
+
+			/* ── Summary Metrics ── */
+			.metrics {
+				display: grid;
+				grid-template-columns: repeat(4, 1fr);
+				gap: 12px;
+			}
+			.metric {
+				background: var(--surface-raised);
+				border: 1px solid var(--border);
+				border-radius: var(--radius);
+				padding: 14px 16px;
+				min-height: 80px;
+				transition: border-color .15s;
+			}
+			.metric:hover {
+				border-color: var(--border-strong);
+			}
+			.metric-label {
+				display: flex;
+				align-items: center;
+				gap: 6px;
+				color: var(--ink-secondary);
+				font-size: 11px;
+				font-weight: 600;
+				text-transform: uppercase;
+				letter-spacing: 0.04em;
+				margin-bottom: 6px;
+			}
+			.metric-value {
+				font-size: 13px;
+				font-weight: 600;
+				color: var(--ink);
+				word-break: break-word;
+				overflow-wrap: anywhere;
+				line-height: 1.3;
+			}
+
+			/* ── Results Table ── */
+			.table-container {
+				overflow-x: auto;
+				-webkit-overflow-scrolling: touch;
+				border: 1px solid var(--border);
+				border-radius: var(--radius);
+				min-width: 0;
+			}
+			table {
+				border-collapse: collapse;
+				font-size: 13px;
+				width: max-content;
+				min-width: 100%;
+			}
+			th {
+				position: sticky;
+				top: 0;
+				background: var(--surface-raised);
+				color: var(--ink-secondary);
+				font-weight: 600;
+				font-size: 11px;
+				text-transform: uppercase;
+				letter-spacing: 0.04em;
+				text-align: right;
+				padding: 10px 12px;
+				border-bottom: 2px solid var(--border);
+				white-space: nowrap;
+				z-index: 1;
+			}
+			th:first-child, th:nth-child(2) { text-align: left; }
+			td {
+				padding: 10px 12px;
+				text-align: right;
+				border-bottom: 1px solid var(--border);
+				white-space: nowrap;
+			}
+			td:first-child, td:nth-child(2) { text-align: left; }
+			tr:last-child td { border-bottom: none; }
+			tr:hover td { background: var(--surface-raised); }
+			.codec-group td {
+				font-weight: 700;
+				font-size: 12px;
+				text-transform: uppercase;
+				letter-spacing: 0.03em;
+				color: var(--ink-secondary);
+				background: var(--surface-raised);
+				border-bottom: 2px solid var(--border);
+				padding: 8px 12px;
+			}
+			.ok { color: var(--accent); font-weight: 600; }
+			.fail { color: var(--danger); font-weight: 600; }
+
+			/* ── Badges ── */
+			.badge {
+				display: inline-flex;
+				align-items: center;
+				gap: 4px;
+				border-radius: 999px;
+				padding: 2px 8px;
+				font-size: 11px;
+				font-weight: 700;
+				white-space: nowrap;
+			}
+			.badge-fastest {
+				background: var(--warning-light);
+				color: var(--warning);
+			}
+			.badge-smallest {
+				background: var(--info-light);
+				color: var(--info);
+			}
+			.badge-default {
+				background: var(--surface-raised);
+				color: var(--ink-secondary);
+				border: 1px solid var(--border);
+			}
+
+			/* ── Error ── */
+			.error-box {
+				color: var(--danger);
+				font-weight: 600;
+				font-size: 13px;
+				white-space: pre-wrap;
+				word-break: break-word;
+				padding: 12px 16px;
+				background: var(--danger-light);
+				border: 1px solid var(--danger);
+				border-radius: var(--radius);
+			}
+
+			/* ── Meta ── */
+			.meta {
+				color: var(--ink-secondary);
+				font-size: 12px;
+				margin-top: 6px;
+			}
+
+			/* ── Loading ── */
+			@keyframes pulse {
+				0%, 100% { opacity: 1; }
+				50% { opacity: .4; }
+			}
+			@keyframes spin {
+				to { transform: rotate(360deg); }
+			}
+			.loading td {
+				text-align: center;
+				padding: 48px 12px;
+				color: var(--ink-secondary);
 			}
 			.loading td::before {
 				content: '';
 				display: inline-block;
 				width: 20px;
 				height: 20px;
-				border: 3px solid var(--line);
+				border: 3px solid var(--border);
 				border-top-color: var(--accent);
 				border-radius: 50%;
-				animation: spin 0.7s linear infinite;
+				animation: spin .7s linear infinite;
 				vertical-align: middle;
 				margin-right: 10px;
 			}
-			@keyframes spin { to { transform: rotate(360deg); } }
-			@media (max-width: 880px) {
-				main { padding: 18px; }
-				header, .grid { display: grid; grid-template-columns: 1fr; }
-				.scenarios, .summary, .codecs { grid-template-columns: 1fr; }
-				th, td { white-space: normal; }
+
+			/* ── Empty State ── */
+			.empty-state {
+				text-align: center;
+				padding: 48px 24px;
+				color: var(--ink-secondary);
+			}
+			.empty-state-text {
+				font-size: 14px;
+				font-weight: 500;
+			}
+
+			/* ── Responsive ── */
+			@media (max-width: 1024px) {
+				.layout {
+					grid-template-columns: 1fr;
+				}
+				.metrics {
+					grid-template-columns: repeat(2, 1fr);
+				}
+			}
+			@media (max-width: 768px) {
+				.container { padding: 20px 16px; }
+				.header {
+					flex-direction: column;
+					align-items: stretch;
+					gap: 16px;
+				}
+				.header-controls {
+					flex-wrap: wrap;
+				}
+				.header-controls select,
+				.header-controls input[type="number"] {
+					flex: 1;
+					min-width: 80px;
+				}
+				.header-controls .btn-primary {
+					flex: 1;
+					min-width: 140px;
+				}
+				.scenarios {
+					grid-template-columns: repeat(2, 1fr);
+				}
+				.codecs {
+					grid-template-columns: repeat(2, 1fr);
+				}
+				th, td { padding: 8px 6px; font-size: 11px; }
+			}
+			@media (max-width: 480px) {
+				.container { padding: 12px; }
+				.header-text h1 { font-size: 18px; }
+				.header-text p { font-size: 12px; }
+				.header-controls { gap: 6px; }
+				.header-controls label { display: none; }
+				.header-controls select {
+					flex: 1;
+					min-width: 0;
+				}
+				.header-controls input[type="number"] {
+					width: 60px;
+					flex: none;
+				}
+				.header-controls .btn-primary {
+					width: 100%;
+					flex: none;
+				}
+				.panel { padding: 14px; }
+				.scenarios { grid-template-columns: 1fr; }
+				.scenario { min-height: auto; padding: 10px; }
+				.codecs { grid-template-columns: repeat(2, 1fr); gap: 2px; }
+				.codecs label { padding: 4px 6px; font-size: 12px; }
+				.metrics { grid-template-columns: 1fr 1fr; gap: 8px; }
+				.metric { padding: 10px 12px; min-height: 68px; }
+				.metric-value { font-size: 11px; }
+				.metric-label { font-size: 10px; }
+				textarea { min-height: 150px; font-size: 11px; }
+				th, td { padding: 6px 4px; font-size: 10px; white-space: nowrap; }
+				.badge { font-size: 10px; padding: 1px 5px; }
 			}
 		</style>
 	</head>
 	<body>
-		<main>
-			<header>
-				<div>
-					<h1>ZipKit browser lab</h1>
-					<p>Compare real payloads across codecs, modes, and uploaded files using the local ZipKit build.</p>
+		<div class="container">
+			<header class="header">
+				<div class="header-brand">
+					<div class="header-text">
+						<h1>ZipKit Browser Lab</h1>
+						<p>Compare compression codecs across real payloads and uploaded files.</p>
+					</div>
 				</div>
-				<div class="row">
-					<label for="mode" style="margin: 0">Mode</label>
+				<div class="header-controls">
+					<label for="mode" style="margin:0">Mode</label>
 					<select id="mode">
-						<option value="balanced" selected>balanced</option>
-						<option value="speed">speed</option>
-						<option value="ratio">ratio</option>
+						<option value="balanced" selected>Balanced</option>
+						<option value="speed">Speed</option>
+						<option value="ratio">Ratio</option>
 					</select>
 					<label for="iterations" style="margin:0">Iterations</label>
-					<input id="iterations" type="number" min="1" max="10000" value="100" style="width:70px;text-align:center;border:1px solid var(--line);border-radius:6px;padding:0 6px;min-height:36px" />
-					<button id="run" class="primary">Run comparison</button>
+					<input id="iterations" type="number" min="1" max="10000" value="100" />
+					<button id="run" class="btn-primary">Run Comparison</button>
 				</div>
 			</header>
 
-			<section class="grid">
+			<section class="layout">
+				<!-- Left: Input Panel -->
 				<div class="panel stack">
 					<div>
 						<label>Scenarios</label>
@@ -187,13 +638,13 @@
 					</div>
 
 					<div id="editor-section">
-						<label for="input">Payload editor</label>
+						<label for="input">Payload Editor</label>
 						<textarea id="input" spellcheck="false"></textarea>
 						<div id="payload-meta" class="meta"></div>
 					</div>
 
-					<div id="upload-section" class="drop" style="display:none">
-						<label for="file">Upload file</label>
+					<div id="upload-section" class="drop-zone" style="display:none">
+						<div class="drop-zone-text">Drag & drop a file here, or <strong>browse</strong></div>
 						<input id="file" type="file" />
 						<div id="file-meta" class="meta">Select a file to use as the payload.</div>
 					</div>
@@ -205,51 +656,72 @@
 
 					<div>
 						<label>Competitors</label>
-						<div class="row">
-							<label style="margin:0; font-weight:500; display:flex; gap:7px; align-items:center">
-								<input type="checkbox" id="include-competitors" checked>
-								Include competitor libraries
-							</label>
+						<div class="toggle-row">
+							<input type="checkbox" id="include-competitors" checked>
+							<label for="include-competitors">Include third-party libraries</label>
 						</div>
 					</div>
 				</div>
 
-				<div class="panel stack">
-					<div class="summary">
-						<div class="metric"><span>Input</span><strong id="input-size">-</strong></div>
-						<div class="metric"><span>Smallest output</span><strong id="best-ratio">-</strong></div>
-						<div class="metric"><span>Fastest compress</span><strong id="best-compress">-</strong></div>
-						<div class="metric"><span>Fastest decompress</span><strong id="best-decompress">-</strong></div>
+				<!-- Right: Results Panel -->
+				<div class="panel stack" id="results-panel">
+					<div class="metrics">
+						<div class="metric">
+							<div class="metric-label">Input</div>
+							<div class="metric-value" id="input-size">-</div>
+						</div>
+						<div class="metric">
+							<div class="metric-label">Smallest Output</div>
+							<div class="metric-value" id="best-ratio">-</div>
+						</div>
+						<div class="metric">
+							<div class="metric-label">Fastest Compress</div>
+							<div class="metric-value" id="best-compress">-</div>
+						</div>
+						<div class="metric">
+							<div class="metric-label">Fastest Decompress</div>
+							<div class="metric-value" id="best-decompress">-</div>
+						</div>
 					</div>
 
 					<div>
 						<label>Results</label>
-						<table>
-							<thead>
-								<tr>
-									<th>Codec</th>
-									<th>Implementation</th>
-									<th>Size</th>
-									<th>Ratio</th>
-									<th>Compress</th>
-									<th>Decompress</th>
-									<th>OK</th>
+						<div class="table-container">
+							<table>
+								<thead>
+									<tr>
+										<th>Codec</th>
+										<th>Implementation</th>
+										<th>Size</th>
+										<th>Ratio</th>
+										<th>Compress</th>
+										<th>Decompress</th>
+										<th>Status</th>
+									</tr>
+								</thead>
+								<tbody id="results">
+								<tr class="empty-row">
+									<td colspan="7">
+										<div class="empty-state">
+											<div class="empty-state-text">Run a comparison to see results.</div>
+										</div>
+									</td>
 								</tr>
-							</thead>
-							<tbody id="results">
-								<tr><td colspan="7" style="text-align: left">Run a comparison to see results.</td></tr>
-							</tbody>
-						</table>
+								</tbody>
+							</table>
+						</div>
 					</div>
-					<div id="error" class="error"></div>
+					<div id="error" class="error-box" style="display:none"></div>
 				</div>
 			</section>
-		</main>
+		</div>
 
 		<script type="module">
 			if (location.protocol === 'file:') {
 				document.getElementById('run').disabled = true;
-				document.getElementById('error').textContent =
+				const errorBox = document.getElementById('error');
+				errorBox.style.display = '';
+				errorBox.textContent =
 					'Run this example through Vite instead of opening index.html directly:\n\n' +
 					'  cd examples/browser\n' +
 					'  bun install\n' +

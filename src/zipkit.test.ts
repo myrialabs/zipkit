@@ -18,6 +18,15 @@ test('gzip/deflate use libdeflate — denser than native zlib', () => {
 	expect(new Uint8Array(Bun.gunzipSync(zk.gzip(data, { mode: 'ratio' })))).toEqual(data);
 });
 
+test('balanced gzip/deflate never below native on size (parity guarantee)', () => {
+	// balanced/speed dispatch to native on Bun, so default output is never larger
+	// than native — the "at least match native" invariant. Density is opt-in via ratio.
+	expect(zk.gzip(data).length).toBeLessThanOrEqual(Bun.gzipSync(data, { level: 6 }).length);
+	expect(zk.deflate(data).length).toBeLessThanOrEqual(Bun.deflateSync(data, { level: 6 }).length);
+	// and still standard-format: native Bun decodes ZipKit's balanced output.
+	expect(new Uint8Array(Bun.gunzipSync(zk.gzip(data)))).toEqual(data);
+});
+
 test('engine-only codecs roundtrip', () => {
 	expect(zk.unlz4(zk.lz4(data))).toEqual(data);
 	expect(zk.unsnappy(zk.snappy(data))).toEqual(data);

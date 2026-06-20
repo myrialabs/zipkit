@@ -118,9 +118,10 @@ zk.runtime;                       // 'bun' | 'wasm' — which path zstd uses
 
 Methods accept either the new options object or the old numeric level shorthand:
 `zk.gzip(bytes, { mode: 'ratio' })` and `zk.gzip(bytes, 9)` are both valid.
-gzip/deflate can dispatch to native Bun zlib for speed on small text-like inputs,
-while `mode: 'ratio'` forces libdeflate. zstd dispatches to native libzstd on Bun
-(the speed ceiling) and the Wasm engine elsewhere; `zk.runtime` reports which.
+gzip/deflate dispatch to native Bun zlib in `speed`/`balanced` mode so throughput
+matches native, while `mode: 'ratio'` forces libdeflate for denser output. zstd
+dispatches to native libzstd on Bun (the speed ceiling) and the Wasm engine
+elsewhere; `zk.runtime` reports which.
 All methods are synchronous.
 
 | Method | Notes |
