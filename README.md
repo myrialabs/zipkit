@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://tunnelkit.myrialabs.dev/favicon.svg" alt="ZipKit" width="72" height="72" />
+  <img src="https://zipkit.myrialabs.dev/favicon.svg" alt="ZipKit" width="72" height="72" />
 </p>
 
 <h1 align="center">ZipKit</h1>
@@ -12,10 +12,10 @@
 
 <p align="center">
   <a href="https://demo.zipkit.myrialabs.dev/">Demo</a> ·
+  <a href="https://zipkit.myrialabs.dev/">Website</a> ·
   <a href="https://www.npmjs.com/package/zipkit">npm</a> ·
   <a href="./docs/api.md">API reference</a> ·
   <a href="./docs/cli.md">CLI reference</a> ·
-  <a href="./docs/algorithms.md">Algorithms</a> ·
   <a href="./examples/README.md">Examples</a> ·
   <a href="https://github.com/myrialabs/zipkit/issues">Issues</a>
 </p>
