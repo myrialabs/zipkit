@@ -8,9 +8,12 @@
  */
 
 import { ZipKit } from './src/zipkit.js';
+import { getEngine } from './src/engine.js';
 import { compressParallel, decompressParallel } from './src/parallel/index.js';
 import { sharedPool } from './src/workers/index.js';
 import { zip as zkZip, unzip as zkUnzip } from './src/zip/index.js';
+import { trainDictionary, compressWithDictionary, decompressWithDictionary } from './src/dictionary.js';
+import { compressDelta, applyDelta } from './src/delta.js';
 import * as fflate from 'fflate';
 import JSZip from 'jszip';
 import pako from 'pako';
@@ -212,6 +215,7 @@ async function main() {
 	process.stderr.write('Loading engines...\n');
 
 	const zk = await ZipKit.load();
+	const engine = await getEngine();
 
 	const zstdMod = await import('@bokuweb/zstd-wasm');
 	await zstdMod.init();
@@ -324,6 +328,11 @@ async function main() {
 		rows.push(await measure('bzip2', 'ZipKit', false, data,
 			(d) => zk.bzip2(d), (d) => zk.unbzip2(d)));
 		process.stderr.write('  bzip2 done\n');
+
+		// ── xz (standard .xz container, LZMA2) ─────────────────────────────────
+		rows.push(await measure('xz', 'ZipKit', false, data,
+			(d) => engine.xzCompress(d, 6), (d) => engine.xzDecompress(d)));
+		process.stderr.write('  xz done\n');
 
 		out.push(renderTable(rows, data));
 		out.push('');
@@ -515,6 +524,62 @@ async function main() {
 	out.push('');
 	out.push(`- ZipKit parallel zip is ${cmpZ(zkPar.cMs, zff.cMs)} than fflate and ${cmpZ(zkPar.cMs, zjs.cMs)} than JSZip, at **${Math.round((1 - zkPar.ratio / zff.ratio) * 100)}% smaller** output (libdeflate).`);
 	out.push('- The `zstd` method packs the same archive denser still — a container no JS competitor offers.');
+	out.push('');
+
+	// ── dictionary & delta — small-payload / incremental wins ──────────────────
+	// Two cases generic codecs handle poorly: many tiny similar payloads, and a
+	// large doc that changed only slightly. Dictionary and delta target both.
+	out.push('---');
+	out.push('');
+	out.push('## Dictionary & delta — small / incremental payloads');
+	out.push('');
+	process.stderr.write('\n=== dictionary & delta ===\n');
+
+	// 500 small, structurally-similar JSON records (~120 B each).
+	const records: Uint8Array[] = [];
+	for (let i = 0; i < 500; i++) {
+		records.push(new TextEncoder().encode(
+			JSON.stringify({ ts: 1_700_000_000 + i, level: ['info', 'warn', 'error'][i % 3], svc: 'api', id: i * 31, msg: `request ${i} handled ok` })
+		));
+	}
+	const dict = await trainDictionary(records);
+	let dictTotal = 0;
+	let plainTotal = 0;
+	for (const r of records) {
+		dictTotal += (await compressWithDictionary(r, dict, { level: 19 })).length;
+		plainTotal += engine.zstdCompress(r, 19).length;
+		// sanity: roundtrip the first record
+	}
+	const rtDict = (await decompressWithDictionary(await compressWithDictionary(records[0]!, dict), dict)).every((v, i) => v === records[0]![i]);
+	const rawTotal = records.reduce((n, r) => n + r.length, 0);
+
+	out.push(`**Dictionary** — 500 similar JSON records (${formatBytes(rawTotal)} raw), compressed individually:`);
+	out.push('');
+	out.push('| Approach | Total size | Ratio | OK |');
+	out.push('|----------|-----------|-------|-----|');
+	out.push(`| zstd L19, per record | ${formatBytes(plainTotal)} | ${(plainTotal / rawTotal * 100).toFixed(1)}% | ✓ |`);
+	out.push(`| zstd L19 + dictionary | ${formatBytes(dictTotal)} | ${(dictTotal / rawTotal * 100).toFixed(1)}% | ${rtDict ? '✓' : '⚠'} |`);
+	out.push('');
+	out.push(`Dictionary output is **${Math.round((1 - dictTotal / plainTotal) * 100)}% smaller** — the shared JSON shape lives in the dictionary, not every frame.`);
+	out.push('');
+
+	// Delta: a 64 KB doc that gains one appended line.
+	const baseDoc = makeLogData(64 * 1024);
+	const newDoc = new Uint8Array(baseDoc.length + 64);
+	newDoc.set(baseDoc, 0);
+	newDoc.set(new TextEncoder().encode('2026-06-17T11:00:00.000 [INFO] svc-1 one appended line\n'), baseDoc.length);
+	const patch = await compressDelta(baseDoc, newDoc, { level: 19 });
+	const standalone = engine.zstdCompress(newDoc, 19);
+	const rtDelta = (await applyDelta(baseDoc, patch)).every((v, i) => v === newDoc[i]);
+
+	out.push(`**Delta** — a ${formatBytes(baseDoc.length)} log doc with one appended line, encoded against the previous revision:`);
+	out.push('');
+	out.push('| Approach | Patch size | OK |');
+	out.push('|----------|-----------|-----|');
+	out.push(`| zstd L19, standalone | ${formatBytes(standalone.length)} | ✓ |`);
+	out.push(`| compressDelta vs base | ${formatBytes(patch.length)} | ${rtDelta ? '✓' : '⚠'} |`);
+	out.push('');
+	out.push(`The delta is **${(standalone.length / patch.length).toFixed(0)}× smaller** than recompressing the whole revision — ideal for logs, chat history, and snapshotted state.`);
 	out.push('');
 
 	// ── legend ──────────────────────────────────────────────────────────────────

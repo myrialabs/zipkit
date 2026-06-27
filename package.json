@@ -1,7 +1,7 @@
 {
   "name": "zipkit",
   "version": "0.0.3",
-  "description": "Overkill compression for Node, Bun & the browser — nine codecs (gzip/deflate/zlib/zstd/lz4/snappy/brotli/lzma/bzip2) plus ZIP, in one tiny typed API over a single WebAssembly engine.",
+  "description": "Overkill compression for Node, Bun & the browser — ten codecs (gzip/deflate/zlib/zstd/lz4/snappy/brotli/lzma/bzip2/xz) plus ZIP (streaming + AES), tar, and 7z, in one tiny typed API over a single WebAssembly engine.",
   "type": "module",
   "exports": {
     ".": {
@@ -27,6 +27,30 @@
     "./zip": {
       "types": "./dist/zip/index.d.ts",
       "import": "./dist/zip/index.js"
+    },
+    "./tar": {
+      "types": "./dist/tar/index.d.ts",
+      "import": "./dist/tar/index.js"
+    },
+    "./sevenzip": {
+      "types": "./dist/sevenzip/index.d.ts",
+      "import": "./dist/sevenzip/index.js"
+    },
+    "./xz": {
+      "types": "./dist/codecs/xz.d.ts",
+      "import": "./dist/codecs/xz.js"
+    },
+    "./dictionary": {
+      "types": "./dist/dictionary.d.ts",
+      "import": "./dist/dictionary.js"
+    },
+    "./delta": {
+      "types": "./dist/delta.d.ts",
+      "import": "./dist/delta.js"
+    },
+    "./fsa": {
+      "types": "./dist/fsa.d.ts",
+      "import": "./dist/fsa.js"
     },
     "./middleware": {
       "types": "./dist/middleware/index.d.ts",
@@ -69,7 +93,12 @@
     "snappy",
     "lzma",
     "bzip2",
+    "xz",
     "zip",
+    "tar",
+    "7z",
+    "encryption",
+    "dictionary",
     "wasm",
     "bun",
     "browser",

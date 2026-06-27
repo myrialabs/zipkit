@@ -9,7 +9,7 @@
 
 import type { Codec, CompressOptions, DecompressOptions } from './types.js';
 import { ZipKitError } from './types.js';
-import { detectFormat } from './detect.js';
+import { detectFormat, isDirectlyDecompressible, type DetectedFormat } from './detect.js';
 import { gzip, gunzip } from './codecs/gzip.js';
 import { deflate, inflate } from './codecs/deflate.js';
 import { zlib, unzlib } from './codecs/zlib.js';
@@ -19,6 +19,7 @@ import { snappy, unsnappy } from './codecs/snappy.js';
 import { brotli, unbrotli } from './codecs/brotli.js';
 import { lzma, unlzma } from './codecs/lzma.js';
 import { bzip2, unbzip2 } from './codecs/bzip2.js';
+import { unxz } from './codecs/xz.js';
 
 const COMPRESSORS: Record<Codec, (d: Uint8Array, o?: CompressOptions) => Promise<Uint8Array>> = {
 	gzip,
@@ -65,12 +66,29 @@ export function decompressWith(data: Uint8Array, codec: Codec, opts?: Decompress
  */
 export async function decompress(data: Uint8Array, opts?: DecompressOptions): Promise<Uint8Array> {
 	const fmt = detectFormat(data);
-	if (!fmt || fmt === 'zip') {
+	if (!fmt) {
 		throw new ZipKitError(
-			fmt === 'zip'
-				? 'Input is a ZIP archive — use unzip() from zipkit/zip (or the `zipkit unzip` CLI command).'
-				: 'Could not auto-detect the compression format. Pass the codec explicitly via decompressWith().'
+			'Could not auto-detect the compression format. Pass the codec explicitly via decompressWith().'
 		);
 	}
-	return decompressWith(data, fmt, opts);
+	// xz is a container, but ZipKit decodes it directly via the engine.
+	if (fmt === 'xz') return unxz(data, opts);
+	if (!isDirectlyDecompressible(fmt)) {
+		throw new ZipKitError(CONTAINER_HINT[fmt as ContainerFormat]);
+	}
+	return decompressWith(data, fmt as Codec, opts);
 }
+
+/** Recognized formats that {@link decompress} cannot decode on its own. */
+type ContainerFormat = Exclude<DetectedFormat, 'gzip' | 'zlib' | 'zstd' | 'xz'>;
+
+/** Guidance for formats {@link decompress} recognizes but can't decode itself. */
+const CONTAINER_HINT: Record<ContainerFormat, string> = {
+	zip: 'Input is a ZIP archive — use unzip() from zipkit/zip (or the `zipkit unzip` CLI command).',
+	tar: 'Input is a tar archive — use untar() from zipkit/tar (or untarGz/untarZstd for compressed tarballs).',
+	'7z': 'Input is a 7z archive — use unSevenZip() from zipkit/sevenzip.',
+	bzip2:
+		'Input is a standard bzip2 (.bz2) stream. ZipKit\'s bzip2 codec uses its own length-prefixed frame, so this external stream needs a standard .bz2 reader.',
+	'lz4-frame':
+		'Input is an LZ4 frame — ZipKit emits and reads the raw LZ4 block; decode frames with a frame-aware LZ4 reader.'
+};

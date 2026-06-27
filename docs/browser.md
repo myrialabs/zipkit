@@ -67,6 +67,23 @@ JS bundle. For size-sensitive apps:
 `CompressionStream` — true streaming with zero Wasm. Other codecs buffer and use
 the engine. See [streaming.md](./streaming.md).
 
+## File System Access
+
+`zipkit/fsa` bridges the browser's `FileSystemFileHandle` to the streaming ZIP
+writer, so you can zip large local files straight to disk without reading them
+all into memory:
+
+```ts
+import { zipToFileHandle, entriesFromFileHandles } from 'zipkit/fsa';
+
+const out = await window.showSaveFilePicker({ suggestedName: 'archive.zip' });
+const picked = await window.showOpenFilePicker({ multiple: true });
+await zipToFileHandle(out, entriesFromFileHandles(picked));
+```
+
+The module imports cleanly everywhere (handles are typed structurally); it just
+needs real handles at call time, so use it behind a `showSaveFilePicker` check.
+
 ## Workers
 
 `zipkit/workers` targets Node/Bun `worker_threads`. In the browser it transparently

@@ -2,7 +2,8 @@
 
 Everything is exported from the package root unless noted. Submodules:
 `zipkit/engine`, `zipkit/streams`, `zipkit/workers`, `zipkit/zip`,
-`zipkit/parallel`, `zipkit/middleware`.
+`zipkit/parallel`, `zipkit/middleware`, `zipkit/tar`, `zipkit/sevenzip`,
+`zipkit/xz`, `zipkit/dictionary`, `zipkit/delta`, `zipkit/fsa`.
 
 All codecs operate on `Uint8Array`. Named codec functions are **async** and lazily
 instantiate the shared Wasm engine on first use; the `ZipKit` class is
@@ -293,7 +294,87 @@ Exports: `elysia`, `express`, `hono`, `negotiate`. Each factory accepts
 
 ---
 
+## Archives & containers
+
+### tar — `zipkit/tar`
+
+```ts
+import { tar, untar, tarGz, untarGz, tarZstd, untarZstd } from 'zipkit/tar';
+const bytes = tar([{ name: 'a.txt', data }, { name: 'dir/', type: 'directory' }]);
+const files = untar(bytes);              // [{ name, data, type, mode, mtime, ... }]
+const gz = await tarGz(entries);         // .tar.gz   (untarGz to read)
+const zst = await tarZstd(entries);      // .tar.zst  (untarZstd to read)
+```
+
+POSIX `ustar` with PAX extensions for long paths / large entries. Interoperates
+with the Unix `tar` CLI and Docker layers.
+
+### xz — `zipkit/xz`
+
+```ts
+import { xz, unxz } from 'zipkit/xz';      // also exported from the root
+const out = await xz(data, { level: 9 });  // standard .xz (LZMA2 + CRC)
+const back = await unxz(out);              // reads xz CLI / .tar.xz too
+```
+
+Full streaming `.xz` from the 7-Zip SDK; `decompress()` auto-detects it.
+
+### 7z — `zipkit/sevenzip`
+
+```ts
+import { sevenZip, unSevenZip } from 'zipkit/sevenzip';
+const archive = await sevenZip([{ name: 'a.txt', data }]);   // LZMA1 (or method: 'copy')
+const files = await unSevenZip(archive);                     // reads copy / LZMA1 / LZMA2
+```
+
+Interoperates with 7-Zip both directions, including LZMA-encoded headers.
+
+### Streaming ZIP — `zipkit/zip`
+
+```ts
+import { zipStream } from 'zipkit/zip';
+await zipStream(entriesIterable, { onProgress }).pipeTo(destination);
+```
+
+Builds an archive incrementally through a `ReadableStream<Uint8Array>` — peak
+memory is one entry, not the whole archive. ZIP64-aware.
+
+### ZIP encryption
+
+```ts
+const enc = await zip(entries, { password: 'secret' });   // WinZip AES-256 (AE-2)
+const out = await unzip(enc, { password: 'secret' });     // also reads legacy ZipCrypto
+```
+
+### Browser File System Access — `zipkit/fsa`
+
+```ts
+import { zipToFileHandle, entriesFromFileHandles } from 'zipkit/fsa';
+await zipToFileHandle(saveHandle, entriesFromFileHandles(pickedHandles));
+```
+
+## Dictionary & delta
+
+```ts
+import { trainDictionary, compressWithDictionary, decompressWithDictionary } from 'zipkit/dictionary';
+const dict = await trainDictionary(samples);              // many small similar payloads
+const small = await compressWithDictionary(record, dict);
+
+import { compressDelta, applyDelta } from 'zipkit/delta';
+const patch = await compressDelta(baseRevision, newRevision);   // log/JSON/chat deltas
+const restored = await applyDelta(baseRevision, patch);
+```
+
+## Integrity
+
+```ts
+import { crc32, verifyChecksum } from 'zipkit';
+const sum = await crc32(bytes);
+await unzip(archive, { verify: true });   // re-checks every entry's CRC-32
+```
+
 ## Errors
 
-- `ZipKitError` — invalid input, unknown codec, or undetectable format.
+- `ZipKitError` — invalid input, unknown codec, undetectable format, wrong
+  password, or a failed integrity/auth check.
 - `AbortError` — operation aborted via an `AbortSignal`.

@@ -66,9 +66,10 @@ zipkit zip site.zip index.html app.js --method zstd
   gzip/deflate/zlib and beats runtime zlib output size on every benchmark dataset.
 - **Runs everywhere** — Node 18+, Bun, and the browser, from the same import. No
   Bun required; native APIs are accelerators only when present.
-- **More than fflate** — feature parity with fflate plus zstd/brotli/lzma/bzip2,
-  ZIP-with-zstd, native `TransformStream`s, and lossless image (QOI) and video
-  (frame-delta) codecs.
+- **More than fflate** — feature parity with fflate plus zstd/brotli/lzma/bzip2/xz,
+  ZIP-with-zstd, **streaming & AES-encrypted ZIP**, **tar** and **7z** containers,
+  **zstd dictionaries** and **delta** compression, native `TransformStream`s, and
+  lossless image (QOI) and video (frame-delta) codecs.
 - **Typed & documented** — TypeScript-first, JSDoc on every export, tree-shakeable
   named imports, `sideEffects: false`.
 
@@ -90,12 +91,19 @@ bun add -g zipkit       # CLI
 | Prefer speed | `await gzip(bytes, { mode: 'speed' })` |
 | Prefer ratio | `await zstd(bytes, { mode: 'ratio' })` |
 | ZIP archive | `await zip([{ name, data }])` · `await unzip(archive)` |
-| Stream | `readable.pipeThrough(compressionStream('gzip'))` |
+| Encrypted ZIP | `await zip(entries, { password })` · `await unzip(a, { password })` |
+| Streaming ZIP | `zipStream(entries).pipeTo(dest)` |
+| tar / tarball | `tar(entries)` · `await tarGz(entries)` (`zipkit/tar`) |
+| 7z | `await sevenZip(entries)` · `await unSevenZip(a)` (`zipkit/sevenzip`) |
+| xz | `await xz(bytes)` · `await unxz(bytes)` |
+| Dictionary / delta | `compressWithDictionary` · `compressDelta` |
+| Stream codec | `readable.pipeThrough(compressionStream('gzip'))` |
 
-> **Auto-detect scope.** `decompress()` recognizes only the self-describing
-> formats — **gzip, zlib, zstd** (and it flags ZIP archives, pointing you to
-> `unzip`). For headerless or ZipKit-framed codecs (brotli, snappy, lz4, lzma,
-> bzip2) name the codec: `decompressWith(bytes, 'brotli')`.
+> **Auto-detect scope.** `decompress()` decodes the self-describing codecs —
+> **gzip, zlib, zstd, xz** — and recognizes container formats (ZIP, tar, 7z,
+> bzip2, lz4-frame), pointing you to the right reader. For headerless or
+> ZipKit-framed codecs (brotli, snappy, lz4, lzma, bzip2) name the codec:
+> `decompressWith(bytes, 'brotli')`.
 
 ### The two API styles
 
@@ -130,36 +138,36 @@ Representative — **E-commerce API**, ~97 KB JSON (throughput, higher is faster
 | Codec | Implementation | Ratio | Compress | Decompress |
 |-------|----------------|------:|---------:|-----------:|
 | **gzip** | | | | |
-| | ZipKit | 5.1% | 391 MB/s | 2.4 GB/s |
-| | ZipKit (ratio) | 4.9% | 51 MB/s | 2.4 GB/s |
-| | fflate | 5.9% | 54 MB/s | 121 MB/s |
-| | Bun.gzipSync | 5.1% | 395 MB/s | 2.6 GB/s |
+| | ZipKit | 5.1% | 396 MB/s | 2.7 GB/s |
+| | ZipKit (ratio) | 4.9% | 51 MB/s | 2.6 GB/s |
+| | fflate | 5.9% | 55 MB/s | 122 MB/s |
+| | Bun.gzipSync | 5.1% | 380 MB/s | 2.5 GB/s |
 | **deflate** | | | | |
-| | ZipKit | 5.1% | 409 MB/s | 2.5 GB/s |
-| | ZipKit (ratio) | 4.9% | 53 MB/s | 2.5 GB/s |
-| | fflate | 5.9% | 66 MB/s | 118 MB/s |
-| | Bun.deflateSync | 5.1% | 408 MB/s | 2.9 GB/s |
+| | ZipKit | 5.1% | 400 MB/s | 2.7 GB/s |
+| | ZipKit (ratio) | 4.9% | 50 MB/s | 2.5 GB/s |
+| | fflate | 5.9% | 68 MB/s | 119 MB/s |
+| | Bun.deflateSync | 5.1% | 399 MB/s | 2.7 GB/s |
 | **zlib** | | | | |
-| | ZipKit | 6.0% | 262 MB/s | 1.2 GB/s |
+| | ZipKit | 6.0% | 273 MB/s | 1.2 GB/s |
 | | ZipKit (ratio) | 4.9% | 53 MB/s | 2.0 GB/s |
-| | fflate | 5.9% | 67 MB/s | 117 MB/s |
+| | fflate | 5.9% | 63 MB/s | 112 MB/s |
 | **zstd** | | | | |
-| | ZipKit | 5.6% | 1.6 GB/s | 3.5 GB/s |
-| | ZipKit (ratio) | 3.9% | 2 MB/s | 4.7 GB/s |
-| | zstd-wasm | 5.6% | 354 MB/s | 970 MB/s |
+| | ZipKit | 5.6% | 1.5 GB/s | 3.4 GB/s |
+| | ZipKit (ratio) | 3.9% | 2 MB/s | 5.3 GB/s |
+| | zstd-wasm | 5.6% | 354 MB/s | 978 MB/s |
 | | Bun.zstdCompressSync | 5.6% | 1.9 GB/s | 3.5 GB/s |
 | **lz4** | | | | |
-| | ZipKit | 12.9% | 1022 MB/s | 2.1 GB/s |
-| | lz4js | 12.5% | 402 MB/s | 492 MB/s |
+| | ZipKit | 12.9% | 1018 MB/s | 2.1 GB/s |
+| | lz4js | 12.5% | 399 MB/s | 515 MB/s |
 | **snappy** | | | | |
-| | ZipKit | 13.5% | 575 MB/s | 1.5 GB/s |
-| | snappyjs | 13.5% | 357 MB/s | 440 MB/s |
+| | ZipKit | 13.5% | 599 MB/s | 1.5 GB/s |
+| | snappyjs | 13.5% | 358 MB/s | 437 MB/s |
 | **brotli** | | | | |
-| | ZipKit | 4.1% | 108 MB/s | 969 MB/s |
-| | ZipKit (ratio) | 3.4% | 613.1 KB/s | 1.8 GB/s |
-| | brotli-wasm | 4.1% | 43 MB/s | 600 MB/s |
+| | ZipKit | 4.1% | 107 MB/s | 844 MB/s |
+| | ZipKit (ratio) | 3.4% | 611.5 KB/s | 1.8 GB/s |
+| | brotli-wasm | 4.1% | 42 MB/s | 560 MB/s |
 | **lzma** | | | | |
-| | ZipKit | 3.8% | 18 MB/s | 395 MB/s |
+| | ZipKit | 3.8% | 18 MB/s | 423 MB/s |
 | **bzip2** | | | | |
 | | ZipKit | 3.4% | 17 MB/s | 83 MB/s |
 
@@ -170,9 +178,13 @@ What the full run adds beyond this table:
 - **`mode: 'ratio'`** trades speed for size: libdeflate gzip/deflate is denser
   than native zlib, and brotli/lzma/bzip2 reach the smallest output (~3.3–3.8% on JSON).
 - **Parallel** (8 cores, 34 MB logs) is the multi-core path native libs lack:
-  `compressParallel` gzip runs **5.1× faster** than `Bun.gzipSync`, same output size.
+  `compressParallel` gzip runs **5.4× faster** than `Bun.gzipSync`, same output size.
 - **ZIP archives** fan entry compression across the pool: a 20-file, 8 MB archive
-  packs **8.5× faster** than `fflate` and **7.5× faster** than JSZip, 10% smaller.
+  packs **8.9× faster** than `fflate` and **7.8× faster** than JSZip, 10% smaller.
+- **Dictionary & delta** target what generic codecs handle poorly: a zstd
+  dictionary makes 500 small JSON records **~66% smaller** than per-record zstd,
+  and `compressDelta` encodes a one-line edit to a 64 KB doc **>250× smaller**
+  than recompressing it. `xz` is included in every codec table too.
 
 ## Streaming
 
@@ -205,6 +217,46 @@ const files = await unzip(archive, { filter: (e) => e.name.endsWith('.js') });
 `store` and `deflate` entries interoperate with every standard ZIP tool; `zstd`
 entries (method 93) are much denser between ZipKit-aware peers. ZIP64 kicks in
 automatically beyond 4 GB / 65 535 entries.
+
+**Encrypted** (WinZip AES-256, reads back in 7-Zip/WinZip), **streaming** (never
+buffers the whole archive), and **integrity-checked**:
+
+```ts
+const enc = await zip(entries, { password: 'secret' });   // AES-256 (AE-2)
+const out = await unzip(enc, { password: 'secret', verify: true });
+
+import { zipStream } from 'zipkit/zip';
+await zipStream(entries).pipeTo(destination);             // memory-bounded
+```
+
+## tar, 7z & xz
+
+```ts
+import { tar, tarGz, untarGz } from 'zipkit/tar';
+import { sevenZip, unSevenZip } from 'zipkit/sevenzip';
+import { xz, unxz } from 'zipkit/xz';
+
+const tgz = await tarGz([{ name: 'a.txt', data }]);        // .tar.gz (also tarZstd)
+const archive = await sevenZip([{ name: 'a.txt', data }]); // 7-Zip-compatible
+const x = await xz(data, { level: 9 });                    // standard .xz
+```
+
+tar is POSIX `ustar`+PAX (Unix-`tar`/Docker compatible); 7z reads/writes
+copy/LZMA(2) and interoperates with 7-Zip both directions; xz is the full
+streaming `.xz` container.
+
+## Dictionary & delta
+
+```ts
+import { trainDictionary, compressWithDictionary } from 'zipkit/dictionary';
+import { compressDelta, applyDelta } from 'zipkit/delta';
+
+const dict = await trainDictionary(samples);          // many small similar payloads
+const small = await compressWithDictionary(record, dict);
+
+const patch = await compressDelta(prevRevision, newRevision);  // logs/chat/state
+const restored = await applyDelta(prevRevision, patch);
+```
 
 ## HTTP middleware
 

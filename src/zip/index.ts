@@ -26,6 +26,8 @@ import { getEngine } from '../engine.js';
 import { ZipKitError } from '../types.js';
 import { sharedPool } from '../workers/index.js';
 import { toDosDateTime, fromDosDateTime } from './datetime.js';
+import { aesEncrypt, aesDecrypt, type AesStrength } from './crypto/winzip.js';
+import { zipCryptoDecrypt } from './crypto/zipcrypto.js';
 
 /** Compress entries concurrently once an archive is at least this large. */
 const PARALLEL_MIN_BYTES = 256 * 1024;
@@ -97,6 +99,19 @@ export interface ZipEntryInfo {
 export interface UnzipOptions {
 	/** Decompress only the entries for which this returns `true`. */
 	filter?: (entry: ZipEntryInfo) => boolean;
+	/**
+	 * Recompute each decompressed entry's CRC-32 and compare it to the value
+	 * stored in the archive, throwing {@link ZipKitError} on a mismatch. Off by
+	 * default — turn it on to detect silent corruption explicitly rather than
+	 * trusting the codec's own (format-dependent) integrity checks.
+	 */
+	verify?: boolean;
+	/**
+	 * Password for encrypted entries. Decrypts WinZip AES (AE-1/AE-2) and legacy
+	 * ZipCrypto entries. Required if the archive is encrypted; a wrong password
+	 * throws {@link ZipKitError}.
+	 */
+	password?: string;
 }
 
 /** Options for {@link zip}. */
@@ -111,6 +126,18 @@ export interface ZipOptions {
 	 * cost more than it saves on tiny archives). Set explicitly to override.
 	 */
 	parallel?: boolean;
+	/**
+	 * Reports archive-build progress as each entry finishes compressing:
+	 * `(entriesDone, totalEntries)`. Fires up to once per entry; the final call
+	 * has `entriesDone === totalEntries`.
+	 */
+	onProgress?: (entriesDone: number, totalEntries: number) => void;
+	/**
+	 * Encrypt every entry with WinZip AES (AE-2). Reads back with the same
+	 * `password` via {@link unzip}, and interoperates with 7-Zip / WinZip. AES-256
+	 * by default; the per-entry CRC is omitted as the AE-2 spec requires.
+	 */
+	password?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -158,6 +185,31 @@ class Writer {
 	}
 }
 
+/** Write a WinZip AES (0x9901) extra field: version 2 (AE-2), vendor "AE". */
+function writeAesExtra(out: Writer, strength: number, actualMethod: number): void {
+	out.u16(0x9901); // header id
+	out.u16(7); // data size
+	out.u16(2); // AE-2
+	out.u16(0x4541); // "AE" (little-endian 'A','E')
+	out.bytes(new Uint8Array([strength]));
+	out.u16(actualMethod);
+}
+
+/** Scan an extra field for the WinZip AES (0x9901) record. */
+function readAesExtra(view: DataView, start: number, len: number): { strength: AesStrength; actualMethod: number } | undefined {
+	let off = start;
+	const end = start + len;
+	while (off + 4 <= end) {
+		const id = view.getUint16(off, true);
+		const size = view.getUint16(off + 2, true);
+		if (id === 0x9901 && size >= 7) {
+			return { strength: view.getUint8(off + 8) as AesStrength, actualMethod: view.getUint16(off + 9, true) };
+		}
+		off += 4 + size;
+	}
+	return undefined;
+}
+
 async function compressEntry(data: Uint8Array, method: ZipMethod, level?: number): Promise<Uint8Array> {
 	if (method === 'store') return data;
 	const e = await getEngine();
@@ -186,23 +238,34 @@ export async function zip(entries: ZipEntryInput[], opts: ZipOptions = {}): Prom
 	const pool = useParallel ? sharedPool() : undefined;
 
 	const crcs = entries.map((entry) => e.crc32(entry.data));
+	let done = 0;
+	const tick = opts.onProgress;
 	const compressedList = await Promise.all(
 		entries.map((entry) => {
 			const method = entry.method ?? 'deflate';
-			if (method === 'store') return Promise.resolve(entry.data);
-			if (pool) {
-				const level = entry.level ?? (method === 'zstd' ? 19 : 6);
-				return pool.zipCompress(entry.data, method, level);
-			}
-			return compressEntry(entry.data, method, entry.level);
+			const work =
+				method === 'store'
+					? Promise.resolve(entry.data)
+					: pool
+						? pool.zipCompress(entry.data, method, entry.level ?? (method === 'zstd' ? 19 : 6))
+						: compressEntry(entry.data, method, entry.level);
+			return tick ? work.then((r) => (tick(++done, entries.length), r)) : work;
 		})
 	);
+
+	// When encrypting, wrap each compressed payload in a WinZip AE-2 envelope.
+	const AES_STRENGTH = 3; // AES-256
+	const encrypted = opts.password
+		? await Promise.all(compressedList.map((c) => aesEncrypt(c, opts.password!, AES_STRENGTH)))
+		: undefined;
+	const storedList = encrypted ? encrypted.map((x) => x.payload) : compressedList;
 
 	const out = new Writer();
 	const central: Array<{
 		nameBytes: Uint8Array;
 		commentBytes: Uint8Array;
 		method: number;
+		actualMethod: number;
 		crc: number;
 		compSize: number;
 		size: number;
@@ -211,6 +274,7 @@ export async function zip(entries: ZipEntryInput[], opts: ZipOptions = {}): Prom
 		offset: number;
 		externalAttrs: number;
 		zip64: boolean;
+		encrypted: boolean;
 	}> = [];
 
 	let needZip64 = entries.length > U16_MAX;
@@ -218,13 +282,19 @@ export async function zip(entries: ZipEntryInput[], opts: ZipOptions = {}): Prom
 	for (let i = 0; i < entries.length; i++) {
 		const entry = entries[i]!;
 		const method = entry.method ?? 'deflate';
-		const methodCode = METHOD_CODE[method];
+		const actualMethod = METHOD_CODE[method];
+		const isEnc = encrypted !== undefined;
+		// AE-2 entries advertise method 99 (AE-x) and carry the real method in the
+		// 0x9901 extra field; their CRC is stored as 0 per the AE-2 spec.
+		const methodCode = isEnc ? 99 : actualMethod;
+		const flag = 0x0800 | (isEnc ? 0x0001 : 0); // UTF-8 names + encrypted bit
 		const nameBytes = utf8.encode(entry.name);
 		const commentBytes = entry.comment ? utf8.encode(entry.comment) : new Uint8Array(0);
 		const crc = crcs[i]!;
-		const compressed = compressedList[i]!;
+		const storedCrc = isEnc ? 0 : crc;
+		const stored = storedList[i]!;
 		const size = entry.data.length;
-		const compSize = compressed.length;
+		const compSize = stored.length;
 		const mtime = entry.mtime === undefined ? new Date() : new Date(entry.mtime);
 		const { date: dosDate, time: dosTime } = toDosDateTime(mtime);
 		// Unix mode goes in the high 16 bits of the external attributes.
@@ -234,17 +304,18 @@ export async function zip(entries: ZipEntryInput[], opts: ZipOptions = {}): Prom
 		if (entryZip64) needZip64 = true;
 
 		// --- Local file header ---
+		const localExtraLen = (entryZip64 ? 20 : 0) + (isEnc ? 11 : 0);
 		out.u32(SIG_LOCAL);
 		out.u16(entryZip64 ? 45 : 20); // version needed
-		out.u16(0x0800); // general purpose flag: UTF-8 names
+		out.u16(flag);
 		out.u16(methodCode);
 		out.u16(dosTime);
 		out.u16(dosDate);
-		out.u32(crc);
+		out.u32(storedCrc);
 		out.u32(entryZip64 ? U32_MAX : compSize);
 		out.u32(entryZip64 ? U32_MAX : size);
 		out.u16(nameBytes.length);
-		out.u16(entryZip64 ? 20 : 0); // extra length (ZIP64 = 4 header + 16 data)
+		out.u16(localExtraLen);
 		out.bytes(nameBytes);
 		if (entryZip64) {
 			out.u16(0x0001);
@@ -252,13 +323,16 @@ export async function zip(entries: ZipEntryInput[], opts: ZipOptions = {}): Prom
 			out.u64(size);
 			out.u64(compSize);
 		}
-		out.bytes(compressed);
+		if (isEnc) writeAesExtra(out, AES_STRENGTH, actualMethod);
+		out.bytes(stored);
 
 		central.push({
 			nameBytes,
 			commentBytes,
 			method: methodCode,
-			crc,
+			actualMethod,
+			encrypted: isEnc,
+			crc: storedCrc,
 			compSize,
 			size,
 			dosDate,
@@ -275,7 +349,7 @@ export async function zip(entries: ZipEntryInput[], opts: ZipOptions = {}): Prom
 		out.u32(SIG_CENTRAL);
 		out.u16(c.zip64 ? 45 : 20); // version made by
 		out.u16(c.zip64 ? 45 : 20); // version needed
-		out.u16(0x0800); // UTF-8 names
+		out.u16(0x0800 | (c.encrypted ? 0x0001 : 0)); // UTF-8 names (+ encrypted)
 		out.u16(c.method);
 		out.u16(c.dosTime);
 		out.u16(c.dosDate);
@@ -289,7 +363,8 @@ export async function zip(entries: ZipEntryInput[], opts: ZipOptions = {}): Prom
 		if (useZip64) {
 			zip64Extra.push(c.size, c.compSize, c.offset);
 		}
-		out.u16(useZip64 ? 4 + zip64Extra.length * 8 : 0); // extra length
+		const extraLen = (useZip64 ? 4 + zip64Extra.length * 8 : 0) + (c.encrypted ? 11 : 0);
+		out.u16(extraLen);
 		out.u16(c.commentBytes.length);
 		out.u16(0); // disk number start
 		out.u16(0); // internal attributes
@@ -301,6 +376,7 @@ export async function zip(entries: ZipEntryInput[], opts: ZipOptions = {}): Prom
 			out.u16(zip64Extra.length * 8);
 			for (const v of zip64Extra) out.u64(v);
 		}
+		if (c.encrypted) writeAesExtra(out, 3, c.actualMethod);
 		out.bytes(c.commentBytes);
 	}
 	const cdSize = out.len - cdStart;
@@ -422,11 +498,13 @@ export async function unzip(data: Uint8Array, opts: UnzipOptions = {}): Promise<
 	}
 
 	const entries: ZipEntry[] = [];
+	const verifier = opts.verify ? await getEngine() : undefined;
 	let p = cdOffset;
 	for (let i = 0; i < count; i++) {
 		if (view.getUint32(p, true) !== SIG_CENTRAL) {
 			throw new ZipKitError('Corrupt ZIP: bad central directory signature');
 		}
+		const flag = view.getUint16(p + 8, true);
 		const method = view.getUint16(p + 10, true);
 		const dosTime = view.getUint16(p + 12, true);
 		const dosDate = view.getUint16(p + 14, true);
@@ -472,13 +550,47 @@ export async function unzip(data: Uint8Array, opts: UnzipOptions = {}): Promise<
 		const localNameLen = view.getUint16(localOffset + 26, true);
 		const localExtraLen = view.getUint16(localOffset + 28, true);
 		const dataStart = localOffset + 30 + localNameLen + localExtraLen;
-		const compressed = data.subarray(dataStart, dataStart + compSize);
-		const decompressed = await decompressEntry(compressed, method, size);
+		const stored = data.subarray(dataStart, dataStart + compSize);
+
+		// Decrypt first when the entry is encrypted, resolving the real
+		// compression method (AES carries it in the 0x9901 extra field).
+		const isEnc = (flag & 0x0001) !== 0;
+		let effectiveMethod = method;
+		let payload = stored;
+		if (isEnc) {
+			if (opts.password === undefined) {
+				throw new ZipKitError(`Entry "${name}" is encrypted — pass { password } to unzip()`);
+			}
+			if (method === 99) {
+				const aes = readAesExtra(view, extraStart, extraLen);
+				if (!aes) throw new ZipKitError(`Entry "${name}" is AES-encrypted but has no AES extra field`);
+				payload = await aesDecrypt(stored, opts.password, aes.strength);
+				effectiveMethod = aes.actualMethod;
+			} else {
+				// Legacy ZipCrypto: the verification byte is the CRC's high byte, or
+				// the DOS time's high byte when a data descriptor (bit 3) is used.
+				const checkByte = flag & 0x0008 ? (dosTime >>> 8) & 0xff : (crc >>> 24) & 0xff;
+				payload = zipCryptoDecrypt(stored, opts.password, checkByte);
+			}
+		}
+
+		const decompressed = await decompressEntry(payload, effectiveMethod, size);
+
+		// AE-2 stores CRC as 0 and relies on its own HMAC, so only verify when a
+		// real CRC is present.
+		if (verifier && !(isEnc && method === 99)) {
+			const actual = verifier.crc32(decompressed) >>> 0;
+			if (actual !== (crc >>> 0)) {
+				throw new ZipKitError(
+					`Checksum mismatch for "${name}": expected ${(crc >>> 0).toString(16)}, got ${actual.toString(16)}`
+				);
+			}
+		}
 
 		entries.push({
 			name,
 			data: decompressed,
-			method,
+			method: effectiveMethod,
 			mtime,
 			size,
 			compressedSize: compSize,
@@ -505,3 +617,6 @@ export async function listEntries(data: Uint8Array): Promise<ZipEntryInfo[]> {
 	});
 	return infos;
 }
+
+// ---- Streaming writer (incremental, memory-bounded) ----
+export { zipStream, type ZipStreamOptions } from './stream.js';

@@ -14,6 +14,13 @@ bun run examples/<file>.ts
 | [`zstd.ts`](./zstd.ts) | zstd at multiple levels + auto-detecting `decompress()` |
 | [`pack.ts`](./pack.ts) | `pack()` — automatically pick the smallest codec |
 | [`zip-archive.ts`](./zip-archive.ts) | Build & read a ZIP (mixed methods, metadata, filter) |
+| [`zip-streaming.ts`](./zip-streaming.ts) | `zipStream()` — stream a ZIP to disk, memory-bounded |
+| [`zip-encrypted.ts`](./zip-encrypted.ts) | Password-protected ZIP (WinZip AES-256) |
+| [`tar-archive.ts`](./tar-archive.ts) | tar / `.tar.gz` / `.tar.zst` build & read |
+| [`sevenzip-archive.ts`](./sevenzip-archive.ts) | Build & read a `.7z` archive (LZMA) |
+| [`xz-codec.ts`](./xz-codec.ts) | Standard `.xz` (LZMA2) + auto-detect |
+| [`dictionary.ts`](./dictionary.ts) | zstd dictionary for many small, similar payloads |
+| [`delta.ts`](./delta.ts) | Delta compression for incremental text/JSON |
 | [`streaming.ts`](./streaming.ts) | `TransformStream` compress → decompress pipeline |
 | [`image-qoi.ts`](./image-qoi.ts) | Lossless image compression (QOI, then QOI→zstd) |
 | [`video-frames.ts`](./video-frames.ts) | Lossless temporal video (frame-delta + zstd) |

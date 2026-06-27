@@ -15,15 +15,32 @@
  *   zipkit version | help
  */
 
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
-import { dirname, join, basename } from 'node:path';
+import { readFileSync, writeFileSync, mkdirSync, statSync, readdirSync } from 'node:fs';
+import { dirname, join, basename, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { compress, decompress, decompressWith } from './compress.js';
 import { detectFormat } from './detect.js';
 import { zip as zipArchive, unzip as unzipArchive, listEntries, type ZipMethod } from './zip/index.js';
-import type { Codec, CompressionMode } from './types.js';
+import { tar, untar, tarGz, untarGz, tarZstd, untarZstd, type TarEntryInput } from './tar/index.js';
+import { sevenZip, unSevenZip, type SevenZipEntryInput } from './sevenzip/index.js';
+import { xz as xzCompressFn, unxz } from './codecs/xz.js';
+import { presetCorpus } from './bench/corpus.js';
+import type { Codec, CompressionMode, CompressOptions } from './types.js';
 
 const CODECS: Codec[] = ['gzip', 'deflate', 'zlib', 'zstd', 'lz4', 'snappy', 'brotli', 'lzma', 'bzip2'];
+/** Codecs selectable on the CLI — the {@link Codec} set plus the `xz` container. */
+const CLI_CODECS = [...CODECS, 'xz'] as const;
+type CliCodec = (typeof CLI_CODECS)[number];
+
+/** Compress with a CLI codec, routing `xz` to its container codec. */
+function cliCompress(data: Uint8Array, codec: CliCodec, opts?: CompressOptions): Promise<Uint8Array> {
+	return codec === 'xz' ? xzCompressFn(data, opts) : compress(data, codec, opts);
+}
+
+/** Decompress with an explicit CLI codec, routing `xz` to its container codec. */
+function cliDecompress(data: Uint8Array, codec: CliCodec): Promise<Uint8Array> {
+	return codec === 'xz' ? unxz(data) : decompressWith(data, codec);
+}
 const MODES: CompressionMode[] = ['speed', 'balanced', 'ratio'];
 
 // --- tiny ANSI helpers (no deps) ---
@@ -78,6 +95,43 @@ function parseArgs(argv: string[]): { positional: string[]; flags: Record<string
 	return { positional, flags };
 }
 
+/** Read a file as a standalone Uint8Array (not a Buffer view into a pool). */
+function readBytes(file: string): Uint8Array {
+	const buf = readFileSync(file);
+	return new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
+}
+
+/** Recursively yield every regular file under `dir`. */
+function* walkDir(dir: string): Generator<string> {
+	for (const ent of readdirSync(dir, { withFileTypes: true })) {
+		const p = join(dir, ent.name);
+		if (ent.isDirectory()) yield* walkDir(p);
+		else if (ent.isFile()) yield p;
+	}
+}
+
+/**
+ * Expand CLI inputs into archive entries. A directory is walked recursively and
+ * its files keep paths relative to the directory's parent (so `zipkit zip out
+ * mydir` stores `mydir/...`); a file is stored under its basename. Archive paths
+ * always use `/` separators.
+ */
+function collectEntries(inputs: string[]): { name: string; data: Uint8Array }[] {
+	const entries: { name: string; data: Uint8Array }[] = [];
+	for (const input of inputs) {
+		const st = statSync(input);
+		if (st.isDirectory()) {
+			const base = dirname(input);
+			for (const filePath of walkDir(input)) {
+				entries.push({ name: relative(base, filePath).split(sep).join('/'), data: readBytes(filePath) });
+			}
+		} else {
+			entries.push({ name: basename(input), data: readBytes(input) });
+		}
+	}
+	return entries;
+}
+
 function fmtBytes(n: number): string {
 	if (n < 1024) return `${n} B`;
 	if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
@@ -95,19 +149,19 @@ const EXT: Partial<Record<Codec, string>> = {
 	lzma: 'lzma',
 	bzip2: 'bz2'
 };
+const XZ_EXT = 'xz';
 
 async function cmdCompress(args: ReturnType<typeof parseArgs>): Promise<void> {
 	const file = args.positional[0];
 	if (!file) fail('Usage: zipkit compress <file> [--codec <codec>] [--mode speed|balanced|ratio] [--level N] [-o out]');
-	const codec = (args.flags.codec as Codec) ?? 'zstd';
-	if (!CODECS.includes(codec)) fail(`Unknown codec: ${codec}. One of: ${CODECS.join(', ')}`);
+	const codec = (args.flags.codec as CliCodec) ?? 'zstd';
+	if (!CLI_CODECS.includes(codec)) fail(`Unknown codec: ${codec}. One of: ${CLI_CODECS.join(', ')}`);
 	const mode = args.flags.mode as CompressionMode | undefined;
 	if (mode && !MODES.includes(mode)) fail(`Unknown mode: ${mode}. One of: ${MODES.join(', ')}`);
 	const level = typeof args.flags.level === 'string' ? Number(args.flags.level) : undefined;
-	const input = readFileSync(file);
-	const data = new Uint8Array(input.buffer, input.byteOffset, input.byteLength);
-	const compressed = await compress(data, codec, { mode, level });
-	const dest = (args.flags.out as string) ?? `${file}.${EXT[codec] ?? codec}`;
+	const data = readBytes(file);
+	const compressed = await cliCompress(data, codec, { mode, level });
+	const dest = (args.flags.out as string) ?? `${file}.${codec === 'xz' ? XZ_EXT : EXT[codec as Codec] ?? codec}`;
 	writeFileSync(dest, compressed);
 	const ratio = data.length ? (compressed.length / data.length) : 0;
 	out(
@@ -119,26 +173,66 @@ async function cmdCompress(args: ReturnType<typeof parseArgs>): Promise<void> {
 async function cmdDecompress(args: ReturnType<typeof parseArgs>): Promise<void> {
 	const file = args.positional[0];
 	if (!file) fail('Usage: zipkit decompress <file> [--codec <codec>] [-o out]');
-	const input = readFileSync(file);
-	const data = new Uint8Array(input.buffer, input.byteOffset, input.byteLength);
-	const codec = args.flags.codec as Codec | undefined;
-	const result = codec ? await decompressWith(data, codec) : await decompress(data);
+	const data = readBytes(file);
+	const codec = args.flags.codec as CliCodec | undefined;
+	if (codec && !CLI_CODECS.includes(codec)) fail(`Unknown codec: ${codec}. One of: ${CLI_CODECS.join(', ')}`);
+	const result = codec ? await cliDecompress(data, codec) : await decompress(data);
 	const dest = (args.flags.out as string) ?? (file.replace(/\.[^.]+$/, '') || `${file}.out`);
 	writeFileSync(dest, result);
 	out(`${c.green('✓')} ${fmtBytes(data.length)} → ${fmtBytes(result.length)}  ${c.dim(dest)}`);
 }
 
 async function cmdZip(args: ReturnType<typeof parseArgs>): Promise<void> {
-	const [archive, ...files] = args.positional;
-	if (!archive || files.length === 0) fail('Usage: zipkit zip <archive.zip> <files...> [--method deflate|zstd|store]');
+	const [archive, ...inputs] = args.positional;
+	if (!archive || inputs.length === 0) {
+		fail('Usage: zipkit zip <archive.zip> <files|dirs...> [--method deflate|zstd|store]');
+	}
 	const method = (args.flags.method as ZipMethod) ?? 'deflate';
-	const entries = files.map((f) => {
-		const buf = readFileSync(f);
-		return { name: basename(f), data: new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength), method };
-	});
+	const entries = collectEntries(inputs).map((e) => ({ ...e, method }));
 	const out2 = await zipArchive(entries);
 	writeFileSync(archive, out2);
-	out(`${c.green('✓')} ${files.length} file(s) → ${archive} ${c.dim(`(${fmtBytes(out2.length)})`)}`);
+	out(`${c.green('✓')} ${entries.length} file(s) → ${archive} ${c.dim(`(${fmtBytes(out2.length)})`)}`);
+}
+
+/** Pick the tar flavor from the archive extension. */
+function tarFlavor(name: string): 'plain' | 'gz' | 'zst' {
+	if (/\.t(ar\.)?gz$/i.test(name) || /\.taz$/i.test(name)) return 'gz';
+	if (/\.t(ar\.)?zst?$/i.test(name)) return 'zst';
+	return 'plain';
+}
+
+async function cmdTar(args: ReturnType<typeof parseArgs>): Promise<void> {
+	const [archive, ...inputs] = args.positional;
+	if (!archive || inputs.length === 0) {
+		fail('Usage: zipkit tar <archive.tar|.tar.gz|.tar.zst> <files|dirs...>');
+	}
+	const entries: TarEntryInput[] = collectEntries(inputs);
+	const flavor = tarFlavor(archive);
+	const bytes = flavor === 'gz' ? await tarGz(entries) : flavor === 'zst' ? await tarZstd(entries) : tar(entries);
+	writeFileSync(archive, bytes);
+	out(`${c.green('✓')} ${entries.length} file(s) → ${archive} ${c.dim(`(${fmtBytes(bytes.length)}, ${flavor})`)}`);
+}
+
+async function cmdUntar(args: ReturnType<typeof parseArgs>): Promise<void> {
+	const file = args.positional[0];
+	if (!file) fail('Usage: zipkit untar <archive.tar|.tar.gz|.tar.zst> [-d <dir>]');
+	const dir = (args.flags.dir as string) ?? '.';
+	const data = readBytes(file);
+	const flavor = tarFlavor(file);
+	const entries = flavor === 'gz' ? await untarGz(data) : flavor === 'zst' ? await untarZstd(data) : untar(data);
+	let files = 0;
+	for (const e of entries) {
+		const dest = join(dir, e.name);
+		if (e.type === 'directory') {
+			mkdirSync(dest, { recursive: true });
+			continue;
+		}
+		mkdirSync(dirname(dest), { recursive: true });
+		writeFileSync(dest, e.data);
+		files++;
+		out(`  ${c.dim('extract')} ${e.name} ${c.dim(`(${fmtBytes(e.size)})`)}`);
+	}
+	out(`${c.green('✓')} ${files} file(s) → ${dir}`);
 }
 
 async function cmdUnzip(args: ReturnType<typeof parseArgs>): Promise<void> {
@@ -147,6 +241,30 @@ async function cmdUnzip(args: ReturnType<typeof parseArgs>): Promise<void> {
 	const dir = (args.flags.dir as string) ?? '.';
 	const input = readFileSync(file);
 	const entries = await unzipArchive(new Uint8Array(input.buffer, input.byteOffset, input.byteLength));
+	for (const e of entries) {
+		const dest = join(dir, e.name);
+		mkdirSync(dirname(dest), { recursive: true });
+		writeFileSync(dest, e.data);
+		out(`  ${c.dim('extract')} ${e.name} ${c.dim(`(${fmtBytes(e.size)})`)}`);
+	}
+	out(`${c.green('✓')} ${entries.length} file(s) → ${dir}`);
+}
+
+async function cmdSevenZip(args: ReturnType<typeof parseArgs>): Promise<void> {
+	const [archive, ...inputs] = args.positional;
+	if (!archive || inputs.length === 0) fail('Usage: zipkit 7z <archive.7z> <files|dirs...> [--method lzma|copy]');
+	const method = (args.flags.method as 'lzma' | 'copy') ?? 'lzma';
+	const entries: SevenZipEntryInput[] = collectEntries(inputs).map((e) => ({ ...e, method }));
+	const bytes = await sevenZip(entries);
+	writeFileSync(archive, bytes);
+	out(`${c.green('✓')} ${entries.length} file(s) → ${archive} ${c.dim(`(${fmtBytes(bytes.length)})`)}`);
+}
+
+async function cmdUnSevenZip(args: ReturnType<typeof parseArgs>): Promise<void> {
+	const file = args.positional[0];
+	if (!file) fail('Usage: zipkit un7z <archive.7z> [-d <dir>]');
+	const dir = (args.flags.dir as string) ?? '.';
+	const entries = await unSevenZip(readBytes(file));
 	for (const e of entries) {
 		const dest = join(dir, e.name);
 		mkdirSync(dirname(dest), { recursive: true });
@@ -173,28 +291,77 @@ async function cmdInfo(args: ReturnType<typeof parseArgs>): Promise<void> {
 	}
 }
 
-async function cmdBench(args: ReturnType<typeof parseArgs>): Promise<void> {
-	const file = args.positional[0];
-	if (!file) fail('Usage: zipkit bench <file>');
-	const input = readFileSync(file);
-	const data = new Uint8Array(input.buffer, input.byteOffset, input.byteLength);
-	out(`${c.bold('bench')} ${file} ${c.dim(`(${fmtBytes(data.length)})`)}`);
-	out(c.dim('codec     ratio    size        comp     decomp'));
-	for (const codec of CODECS) {
+interface BenchRow {
+	codec: string;
+	ratio: number;
+	size: number;
+	compMs: number;
+	decompMs: number;
+	error?: string;
+}
+
+/** Run every CLI codec over `data`, returning one row each. */
+async function benchDataset(data: Uint8Array): Promise<BenchRow[]> {
+	const rows: BenchRow[] = [];
+	for (const codec of CLI_CODECS) {
 		try {
 			const t0 = performance.now();
-			const comp = await compress(data, codec);
+			const comp = await cliCompress(data, codec);
 			const t1 = performance.now();
-			await decompressWith(comp, codec);
+			await cliDecompress(comp, codec);
 			const t2 = performance.now();
-			const ratio = data.length ? comp.length / data.length : 0;
-			out(
-				`${codec.padEnd(9)} ${(ratio * 100).toFixed(1).padStart(5)}%  ${fmtBytes(comp.length).padStart(10)}  ` +
-					`${(t1 - t0).toFixed(1).padStart(6)}ms ${(t2 - t1).toFixed(1).padStart(6)}ms`
-			);
+			rows.push({
+				codec,
+				ratio: data.length ? comp.length / data.length : 0,
+				size: comp.length,
+				compMs: t1 - t0,
+				decompMs: t2 - t1
+			});
 		} catch (e) {
-			out(`${codec.padEnd(9)} ${c.red('failed')} ${c.dim(e instanceof Error ? e.message : String(e))}`);
+			rows.push({ codec, ratio: 0, size: 0, compMs: 0, decompMs: 0, error: e instanceof Error ? e.message : String(e) });
 		}
+	}
+	return rows;
+}
+
+function printBenchTable(rows: BenchRow[]): void {
+	out(c.dim('codec     ratio    size        comp     decomp'));
+	for (const r of rows) {
+		if (r.error) {
+			out(`${r.codec.padEnd(9)} ${c.red('failed')} ${c.dim(r.error)}`);
+			continue;
+		}
+		out(
+			`${r.codec.padEnd(9)} ${(r.ratio * 100).toFixed(1).padStart(5)}%  ${fmtBytes(r.size).padStart(10)}  ` +
+				`${r.compMs.toFixed(1).padStart(6)}ms ${r.decompMs.toFixed(1).padStart(6)}ms`
+		);
+	}
+}
+
+async function cmdBench(args: ReturnType<typeof parseArgs>): Promise<void> {
+	const file = args.positional[0];
+	const asJson = args.flags.json === true;
+
+	// Datasets: an explicit file, or the built-in deterministic preset corpus.
+	const datasets: { name: string; description?: string; data: Uint8Array }[] = file
+		? [{ name: file, data: readBytes(file) }]
+		: presetCorpus().map((d) => ({ name: d.name, description: d.description, data: d.data }));
+
+	const report: { dataset: string; bytes: number; rows: BenchRow[] }[] = [];
+	for (const ds of datasets) {
+		report.push({ dataset: ds.name, bytes: ds.data.length, rows: await benchDataset(ds.data) });
+	}
+
+	if (asJson) {
+		out(JSON.stringify(report, null, 2));
+		return;
+	}
+
+	if (!file) out(c.dim('No file given — benchmarking the built-in preset corpus.'));
+	for (const r of report) {
+		out('');
+		out(`${c.bold('bench')} ${r.dataset} ${c.dim(`(${fmtBytes(r.bytes)})`)}`);
+		printBenchTable(r.rows);
 	}
 }
 
@@ -208,15 +375,19 @@ ${c.bold('USAGE')}
 ${c.bold('COMMANDS')}
   compress <file>      Compress a file        ${c.dim('--codec <c> --mode <m> --level N -o out')}
   decompress <file>    Decompress a file      ${c.dim('--codec <c> (auto-detects) -o out')}
-  zip <out.zip> <files...>   Create a ZIP     ${c.dim('--method deflate|zstd|store')}
+  zip <out.zip> <files|dirs...>   Create a ZIP ${c.dim('--method deflate|zstd|store (dirs recurse)')}
   unzip <archive.zip>  Extract a ZIP          ${c.dim('-d <dir>')}
+  tar <out.tar[.gz|.zst]> <files|dirs...>   Create a tarball ${c.dim('(flavor by extension)')}
+  untar <archive.tar[.gz|.zst]>   Extract a tarball ${c.dim('-d <dir>')}
+  7z <out.7z> <files|dirs...>   Create a 7z archive ${c.dim('--method lzma|copy')}
+  un7z <archive.7z>    Extract a 7z archive       ${c.dim('-d <dir>')}
   info <file>          Show format / ZIP listing
-  bench <file>         Compare every codec on a file
+  bench [file]         Compare every codec ${c.dim('(preset corpus if no file; --json for CI)')}
   version              Print the version
   help                 Show this help
 
 ${c.bold('CODECS')}
-  ${CODECS.join(', ')}
+  ${CLI_CODECS.join(', ')}
 
 ${c.bold('MODES')}
   ${MODES.join(', ')}  ${c.dim('(speed | balanced [default] | ratio — picks a codec-specific level)')}
@@ -224,8 +395,10 @@ ${c.bold('MODES')}
 ${c.bold('EXAMPLES')}
   zipkit compress data.json --codec zstd --mode ratio
   zipkit decompress data.json.zst
-  zipkit zip site.zip index.html app.js --method zstd
+  zipkit zip site.zip ./public --method zstd
   zipkit unzip site.zip -d ./out
+  zipkit tar release.tar.zst ./dist
+  zipkit untar release.tar.zst -d ./out
   zipkit bench big.log
 
 Docs: https://github.com/myrialabs/zipkit
@@ -256,6 +429,14 @@ async function main(): Promise<void> {
 			return cmdZip(rest);
 		case 'unzip':
 			return cmdUnzip(rest);
+		case 'tar':
+			return cmdTar(rest);
+		case 'untar':
+			return cmdUntar(rest);
+		case '7z':
+			return cmdSevenZip(rest);
+		case 'un7z':
+			return cmdUnSevenZip(rest);
 		case 'info':
 			return cmdInfo(rest);
 		case 'bench':

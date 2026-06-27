@@ -43,6 +43,8 @@ const archive = await zip([
 | Field | Type | Default | Notes |
 | --- | --- | --- | --- |
 | `parallel` | `boolean` | auto | compress entries across the worker pool |
+| `onProgress` | `(done, total) => void` | — | fires as each entry finishes compressing |
+| `password` | `string` | — | encrypt every entry with WinZip AES-256 (AE-2) |
 
 CRC-32 is computed in Wasm (libdeflate's SIMD path). Entry compression fans out
 over the worker pool — `parallel` defaults to on once there are at least two
@@ -59,6 +61,35 @@ for (const e of entries) {
   console.log(e.name, e.size, e.mtime, e.unixPermissions);
   await Bun.write(e.name, e.data);
 }
+```
+
+### Encryption
+
+```ts
+const enc = await zip(entries, { password: 'secret' });   // WinZip AES-256 (AE-2)
+const out = await unzip(enc, { password: 'secret' });     // also reads legacy ZipCrypto
+```
+
+New archives use WinZip AES-256 (AE-2), interoperable with 7-Zip and WinZip. On
+read, both WinZip AES and legacy PKWARE ZipCrypto are decrypted; a wrong password
+throws `ZipKitError` before any plaintext is produced. PBKDF2/HMAC-SHA1 come from
+WebCrypto, so encryption needs `crypto.subtle` (present in Node 18+, Bun, and
+browsers).
+
+### Integrity check
+
+```ts
+const out = await unzip(archive, { verify: true });  // re-checks every entry's CRC-32
+```
+
+### Streaming writer
+
+For archives too large to hold in memory, `zipStream()` emits the archive
+incrementally through a `ReadableStream<Uint8Array>` — peak memory is one entry:
+
+```ts
+import { zipStream } from 'zipkit/zip';
+await zipStream(entriesIterable).pipeTo(destinationWritable);
 ```
 
 ### Filtering
@@ -101,6 +132,8 @@ const list = await listEntries(archive);   // ZipEntryInfo[] — names, sizes, m
 
 ## Limitations
 
-- Archives are built and read fully in memory (async because the codecs are Wasm).
-  For multi-gigabyte archives, ensure enough memory is available.
-- Encryption is not supported.
+- `zip()` / `unzip()` build and read fully in memory (async because the codecs
+  are Wasm). For multi-gigabyte archives, use `zipStream()`, whose peak memory is
+  the single largest entry.
+- Encrypted reading covers WinZip AES (AE-1/AE-2) and legacy ZipCrypto; ZipKit
+  only ever *writes* WinZip AES (the weak ZipCrypto cipher is read-only).

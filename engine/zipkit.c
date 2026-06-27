@@ -259,6 +259,63 @@ EMSCRIPTEN_KEEPALIVE void zk_zstd_max_compress(size_t len, int level) {
 #endif
 
 // =============================================================================
+// Zstd dictionary — train a dictionary from samples, then compress/decompress
+// with it. Big win for many small, similar payloads (logs, JSON records, RPC).
+// The dictionary (or, for training, the per-sample sizes as u32 LE) is staged
+// into an auxiliary buffer via zk_set_aux before the main call.
+// =============================================================================
+#ifdef ZK_ZSTD
+#include "zdict.h"
+static uint8_t *g_aux = 0;
+static size_t g_aux_cap = 0;
+static size_t g_aux_len = 0;
+
+// Copy `len` bytes from the input buffer into the auxiliary buffer, where they
+// persist across the next codec call (used to hand over a dictionary or the
+// sample-size table without a second live input region).
+EMSCRIPTEN_KEEPALIVE void zk_set_aux(size_t len) {
+  ensure(&g_aux, &g_aux_cap, len ? len : 1);
+  memcpy(g_aux, g_in, len);
+  g_aux_len = len;
+}
+
+// Train a dictionary of up to `dictCap` bytes from `nSamples` samples packed
+// back-to-back in g_in; the per-sample byte lengths are the u32 LE table staged
+// in g_aux (== size_t on wasm32). Result: the dictionary bytes.
+EMSCRIPTEN_KEEPALIVE void zk_zstd_train_dict(size_t samplesLen, unsigned nSamples,
+                                             size_t dictCap) {
+  (void)samplesLen;
+  ensure(&g_out, &g_out_cap, dictCap);
+  size_t n = ZDICT_trainFromBuffer(g_out, dictCap, g_in,
+                                   (const size_t *)g_aux, nSamples);
+  set_out(ZDICT_isError(n) ? 0 : n);
+}
+
+EMSCRIPTEN_KEEPALIVE void zk_zstd_compress_dict(size_t len, int level) {
+  if (!g_cctx) g_cctx = ZSTD_createCCtx();
+  ZSTD_CCtx_reset(g_cctx, ZSTD_reset_session_and_parameters);
+  size_t bound = ZSTD_compressBound(len);
+  ensure(&g_out, &g_out_cap, bound);
+  size_t n = ZSTD_compress_usingDict(g_cctx, g_out, g_out_cap, g_in, len,
+                                     g_aux, g_aux_len, level);
+  set_out(ZSTD_isError(n) ? 0 : n);
+}
+
+EMSCRIPTEN_KEEPALIVE void zk_zstd_decompress_dict(size_t len) {
+  if (!g_dctx) g_dctx = ZSTD_createDCtx();
+  unsigned long long sz = ZSTD_getFrameContentSize(g_in, len);
+  size_t outcap = (sz != ZSTD_CONTENTSIZE_UNKNOWN &&
+                   sz != ZSTD_CONTENTSIZE_ERROR && sz > 0)
+                      ? (size_t)sz
+                      : len * 8 + 1024;
+  ensure(&g_out, &g_out_cap, outcap);
+  size_t n = ZSTD_decompress_usingDict(g_dctx, g_out, g_out_cap, g_in, len,
+                                       g_aux, g_aux_len);
+  set_out(ZSTD_isError(n) ? 0 : n);
+}
+#endif // ZK_ZSTD (dictionary)
+
+// =============================================================================
 // LZMA (7-zip SDK) — highest general-purpose ratio. Frame: [5 props][8 LE size][data]
 // =============================================================================
 #ifdef ZK_LZMA
@@ -295,6 +352,175 @@ EMSCRIPTEN_KEEPALIVE void zk_lzma_decompress(size_t len) {
   set_out(res == 0 ? destLen : 0);
 }
 #endif // ZK_LZMA
+
+// =============================================================================
+// xz (7-zip SDK) — the standard .xz container around LZMA2. Full streaming
+// encode/decode (continuation chunks, CRC integrity check), so it interops with
+// the `xz` CLI and `.tar.xz` in the wild — unlike a hand-rolled chunker.
+// =============================================================================
+#ifdef ZK_XZ
+#include "Xz.h"
+#include "XzEnc.h"
+#include "Alloc.h"
+#include "7zCrc.h"
+#include "XzCrc64.h"
+
+// The SDK's CRC routines dispatch through a function pointer that stays NULL
+// until the table is generated; calling xz before this would trap. Init once.
+static int g_xz_crc_ready = 0;
+static void xz_crc_init(void) {
+  if (!g_xz_crc_ready) {
+    CrcGenerateTable();
+    Crc64GenerateTable();
+    g_xz_crc_ready = 1;
+  }
+}
+
+// Success flag for the last xz call. An empty result is ambiguous (a valid xz
+// stream can decode to zero bytes), so callers check this instead of length.
+static int g_xz_ok = 0;
+EMSCRIPTEN_KEEPALIVE int zk_xz_ok(void) { return g_xz_ok; }
+
+// In-memory ISeqInStream over g_in. The vtable struct is the first member, so a
+// callback pointer can be cast straight back to the wrapper.
+typedef struct {
+  ISeqInStream vt;
+  const Byte *data;
+  size_t pos;
+  size_t len;
+} XzMemIn;
+static SRes XzMemIn_Read(const ISeqInStream *pp, void *buf, size_t *size) {
+  XzMemIn *p = (XzMemIn *)pp;
+  size_t avail = p->len - p->pos;
+  size_t n = *size < avail ? *size : avail;
+  memcpy(buf, p->data + p->pos, n);
+  p->pos += n;
+  *size = n;
+  return SZ_OK;
+}
+
+// In-memory ISeqOutStream appending to g_out, growing as needed. Tracks the
+// running length in g_result_len so the wrapper can publish it on success.
+typedef struct {
+  ISeqOutStream vt;
+} XzMemOut;
+static size_t XzMemOut_Write(const ISeqOutStream *pp, const void *buf, size_t size) {
+  (void)pp;
+  ensure(&g_out, &g_out_cap, g_result_len + size);
+  memcpy(g_out + g_result_len, buf, size);
+  g_result_len += size;
+  return size;
+}
+
+EMSCRIPTEN_KEEPALIVE void zk_xz_compress(size_t len, int level) {
+  xz_crc_init();
+  g_xz_ok = 0;
+  XzMemIn in;
+  in.vt.Read = XzMemIn_Read;
+  in.data = g_in;
+  in.pos = 0;
+  in.len = len;
+  XzMemOut out;
+  out.vt.Write = XzMemOut_Write;
+
+  CXzProps props;
+  XzProps_Init(&props);
+  props.lzma2Props.lzmaProps.level = level;
+  props.checkId = XZ_CHECK_CRC32; // CRC32 integrity — no SHA dependency
+
+  ensure(&g_out, &g_out_cap, len / 2 + 1024);
+  g_result_len = 0;
+  SRes res = Xz_Encode(&out.vt, &in.vt, &props, NULL);
+  if (res != SZ_OK) {
+    set_out(0);
+    return;
+  }
+  g_xz_ok = 1;
+}
+
+// Read a single xz/LZMA variable-length integer from buf[*pos], advancing *pos.
+// Returns 0 on malformed input.
+static int xz_read_vli(const Byte *buf, size_t *pos, size_t end, uint64_t *out) {
+  uint64_t v = 0;
+  int shift = 0;
+  for (;;) {
+    if (*pos >= end || shift > 63) return 0;
+    Byte b = buf[(*pos)++];
+    v |= (uint64_t)(b & 0x7f) << shift;
+    if (!(b & 0x80)) break;
+    shift += 7;
+  }
+  *out = v;
+  return 1;
+}
+
+// Compute the total uncompressed size of a (single-stream) xz buffer by reading
+// its Index, so the whole stream can be decoded in one exact-sized call.
+static int xz_uncompressed_size(const Byte *buf, size_t len, uint64_t *outSize) {
+  if (len < 12) return 0;
+  const Byte *footer = buf + len - 12;
+  if (footer[10] != 'Y' || footer[11] != 'Z') return 0; // footer magic
+  uint32_t backward = footer[4] | (footer[5] << 8) | (footer[6] << 16) |
+                      ((uint32_t)footer[7] << 24);
+  uint64_t indexSize = ((uint64_t)backward + 1) * 4;
+  if (indexSize + 12 > len) return 0;
+  size_t base = len - 12 - indexSize;
+  size_t pos = base;
+  size_t end = len - 12;
+  if (buf[pos++] != 0) return 0; // Index Indicator
+  uint64_t nrec = 0;
+  if (!xz_read_vli(buf, &pos, end, &nrec)) return 0;
+  uint64_t total = 0;
+  for (uint64_t r = 0; r < nrec; r++) {
+    uint64_t unpadded = 0, uncomp = 0;
+    if (!xz_read_vli(buf, &pos, end, &unpadded)) return 0;
+    if (!xz_read_vli(buf, &pos, end, &uncomp)) return 0;
+    total += uncomp;
+  }
+  *outSize = total;
+  return 1;
+}
+
+EMSCRIPTEN_KEEPALIVE void zk_xz_decompress(size_t len) {
+  xz_crc_init();
+  g_xz_ok = 0;
+
+  uint64_t outSize = 0;
+  if (!xz_uncompressed_size(g_in, len, &outSize)) { set_out(0); return; }
+  ensure(&g_out, &g_out_cap, outSize ? (size_t)outSize : 1);
+
+  CXzUnpacker un;
+  XzUnpacker_Construct(&un, &g_Alloc);
+  SizeT destLen = (SizeT)outSize;
+  SizeT srcLen = len;
+  ECoderStatus status;
+  SRes res = XzUnpacker_CodeFull(&un, g_out, &destLen, g_in, &srcLen,
+                                 CODER_FINISH_END, &status);
+  XzUnpacker_Free(&un);
+  // Success: no error and exactly the Index-declared number of bytes produced.
+  // (A complete single stream ends as NEEDS_MORE_INPUT — the decoder is looking
+  // for a possible next stream — so don't require FINISHED_WITH_MARK here.)
+  if (res == SZ_OK && (SizeT)destLen == (SizeT)outSize) {
+    set_out(destLen);
+    g_xz_ok = 1;
+  } else {
+    set_out(0);
+  }
+}
+
+// Standalone LZMA2 decode (used by the 7z reader for LZMA2-coded folders). The
+// unpacked size is known from the 7z header, so the output buffer is exact.
+#include "Lzma2Dec.h"
+EMSCRIPTEN_KEEPALIVE void zk_lzma2_decompress(size_t len, int prop, size_t outSize) {
+  ensure(&g_out, &g_out_cap, outSize ? outSize : 1);
+  SizeT destLen = outSize;
+  SizeT srcLen = len;
+  ELzmaStatus status;
+  SRes res = Lzma2Decode(g_out, &destLen, g_in, &srcLen, (Byte)prop,
+                         LZMA_FINISH_END, &status, &g_Alloc);
+  set_out(res == SZ_OK ? destLen : 0);
+}
+#endif // ZK_XZ
 
 // =============================================================================
 // bzip2 — Burrows-Wheeler. Frame: [8 LE size][data]

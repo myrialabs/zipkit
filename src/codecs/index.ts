@@ -11,6 +11,7 @@ export { lz4, unlz4 } from './lz4.js';
 export { snappy, unsnappy } from './snappy.js';
 export { brotli, unbrotli } from './brotli.js';
 export { lzma, unlzma } from './lzma.js';
+export { xz, unxz } from './xz.js';
 export { bzip2, unbzip2 } from './bzip2.js';
 export { encodeImage, decodeImage } from './image.js';
 export { encodeFrames, decodeFrames, type FrameCodec } from './video.js';

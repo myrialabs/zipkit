@@ -1,0 +1,70 @@
+# ZipKit — Daftar Penambahan Fitur (untuk AI coding agent)
+
+Konteks: ZipKit (`@myrialabs/zipkit` / `zipkit` di npm) adalah library kompresi satu-API
+di atas satu Wasm engine, mendukung 9 codec (gzip, deflate, zlib, zstd, lz4, snappy,
+brotli, lzma, bzip2) plus container ZIP. Target runtime: Node 18+, Bun, browser.
+Repo: https://github.com/myrialabs/zipkit
+
+Dokumen ini berisi daftar fitur yang belum ada dan perlu ditambahkan. Semua item
+di bawah ini dianggap prioritas tinggi. Untuk setiap item, ikuti workflow Phase 0
+yang biasa dipakai di ekosistem Myrialabs: tulis benchmark/spec dulu sebelum
+implementasi.
+
+## 1. Dukungan Tar (`.tar`, `.tar.gz`, `.tar.zst`)
+- Reader + writer untuk format tar (ustar/POSIX).
+- Kombinasi langsung dengan codec yang sudah ada: `tar()` + `gzip()`/`zstd()` →
+  helper `tarGz()`, `tarZstd()` agar tidak perlu manual pipe dua fungsi.
+- Harus interoperable dengan `tar` CLI standar Unix dan Docker layer format.
+
+## 2. Streaming ZIP Writer (tanpa buffer penuh di memory)
+- API baru, misal `zipStream()` yang menerima entries satu per satu dan menulis
+  output secara incremental (mirip `TransformStream` yang sudah ada untuk gzip).
+- Penting untuk arsip besar (ratusan MB–GB) agar tidak OOM di Node/Bun maupun browser.
+- Tetap harus kompatibel dengan ZIP64 yang sudah ada.
+
+## 3. Enkripsi ZIP (baca dan tulis)
+- Dukungan AES-256 (WinZip AE-2) untuk membuat ZIP baru.
+- Dukungan baca legacy ZipCrypto untuk kompatibilitas baca file lama.
+- API: opsi `password` di `zip()`/`unzip()`.
+
+## 4. Dukungan 7z (reader dan writer)
+- Reader: parser untuk membaca arsip `.7z` — header, folder structure, CRC.
+  LZMA decoder sudah ada di ZipKit, jadi tinggal implementasi parsing container
+  format 7z di atasnya.
+- Writer: implementasi penulisan arsip `.7z` yang valid dan dapat dibuka oleh
+  7-Zip serta tool lain yang mendukung format ini, termasuk header encoding,
+  folder/coder structure, dan CRC.
+- API: `sevenZip()` / `unSevenZip()` atau `compress7z()` / `decompress7z()`
+  mengikuti pola named-pair yang sudah dipakai codec lain di ZipKit.
+
+## 5. CRC32 Verification Eksplisit
+- Expose fungsi `verifyChecksum()` / opsi `verify: true` saat `unzip()` atau
+  `decompress()` untuk deteksi korupsi data secara eksplisit, bukan cuma
+  implicit di auto-detect format.
+
+## 6. Progress Callback untuk Operasi Besar
+- Tambahkan opsi `onProgress(percent)` di `compress()`, `zip()`, `pack()`, dan
+  varian streaming-nya.
+- Penting untuk UI yang menampilkan progress bar (misal di Clopen) saat
+  compress file besar.
+
+## 7. File System Access API Helper (browser)
+- Helper untuk kompres/zip langsung dari `FileSystemFileHandle` browser tanpa
+  harus baca penuh file ke memory dulu.
+
+## 8. Benchmark Dataset Preset
+- Tambahkan preset corpus standar (teks, JSON, gambar) di `zipkit bench` agar
+  perbandingan ratio/timing antar versi atau PR bisa apple-to-apple, bukan
+  bergantung pada file user yang berbeda-beda.
+
+## 9. Incremental/Diff-based Compression untuk Teks/JSON
+- Mirip prinsip `encodeFrames` (frame-delta + zstd) yang sudah ada untuk video,
+  tapi diterapkan untuk data teks/JSON yang sering berubah kecil-kecil
+  (contoh use-case: log streaming, riwayat chat di agentic tools).
+
+## Catatan
+- RAR tidak masuk daftar ini karena format-nya proprietary/closed-source —
+  tidak ada implementasi C terbuka yang bisa dibungkus ke Wasm tanpa risiko
+  hukum/lisensi.
+- Untuk setiap fitur, pertahankan filosofi ZipKit: satu API typed & tree-shakeable,
+  byte-only (`Uint8Array`), berjalan sama di Node, Bun, dan browser.

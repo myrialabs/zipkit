@@ -45,6 +45,14 @@ interface Mod {
 	_zk_zstd_max_compress(len: number, level: number): void;
 	_zk_lzma_compress(len: number, level: number): void;
 	_zk_lzma_decompress(len: number): void;
+	_zk_xz_compress(len: number, level: number): void;
+	_zk_xz_decompress(len: number): void;
+	_zk_xz_ok(): number;
+	_zk_lzma2_decompress(len: number, prop: number, outSize: number): void;
+	_zk_set_aux(len: number): void;
+	_zk_zstd_train_dict(samplesLen: number, nSamples: number, dictCap: number): void;
+	_zk_zstd_compress_dict(len: number, level: number): void;
+	_zk_zstd_decompress_dict(len: number): void;
 	_zk_bzip2_compress(len: number, level: number): void;
 	_zk_bzip2_decompress(len: number): void;
 	_zk_qoi_encode(len: number, w: number, h: number, ch: number): void;
@@ -150,6 +158,65 @@ export class ZipKitEngine {
 	}
 	lzmaDecompress(d: Uint8Array): Uint8Array {
 		return this.call((l) => this.m._zk_lzma_decompress(l), d);
+	}
+
+	/**
+	 * Decode a raw LZMA2 stream (used by the 7z reader). `prop` is the single
+	 * LZMA2 dictionary-size property byte; `outSize` is the known unpacked size.
+	 */
+	lzma2Decompress(d: Uint8Array, prop: number, outSize: number): Uint8Array {
+		return this.call((l) => this.m._zk_lzma2_decompress(l, prop, outSize), d);
+	}
+
+	/** xz — the standard `.xz` container around LZMA2 (full streaming codec). */
+	xzCompress(d: Uint8Array, level = 6): Uint8Array {
+		const out = this.call((l) => this.m._zk_xz_compress(l, level), d);
+		if (!this.m._zk_xz_ok()) throw new Error('xz compression failed');
+		return out;
+	}
+	xzDecompress(d: Uint8Array): Uint8Array {
+		// An empty result is valid (a stream can decode to zero bytes), so success
+		// is read from the engine's explicit flag, not the output length.
+		const out = this.call((l) => this.m._zk_xz_decompress(l), d);
+		if (!this.m._zk_xz_ok()) throw new Error('xz decompression failed (corrupt stream or unsupported filter)');
+		return out;
+	}
+
+	/**
+	 * Stage `dict` into the engine's auxiliary buffer for the next dictionary
+	 * call. Held until the next {@link setAux}, so set it immediately before
+	 * {@link zstdCompressDict}/{@link zstdDecompressDict} or {@link zstdTrainDict}.
+	 */
+	setAux(dict: Uint8Array): void {
+		const m = this.m;
+		const p = m._zk_input_ptr(dict.length);
+		m.HEAPU8.set(dict, p);
+		m._zk_set_aux(dict.length);
+	}
+
+	/**
+	 * Train a zstd dictionary of up to `dictCapacity` bytes from `samples`. Stage
+	 * the per-sample sizes (u32 LE) via {@link setAux} first; `samples` is the
+	 * concatenation of every sample. Returns the dictionary bytes (empty on
+	 * failure, e.g. too few samples).
+	 */
+	zstdTrainDict(samples: Uint8Array, nSamples: number, dictCapacity: number): Uint8Array {
+		const m = this.m;
+		const p = m._zk_input_ptr(samples.length);
+		m.HEAPU8.set(samples, p);
+		m._zk_zstd_train_dict(samples.length, nSamples, dictCapacity);
+		const op = m._zk_result_ptr();
+		const ol = m._zk_result_len() >>> 0;
+		return m.HEAPU8.slice(op, op + ol);
+	}
+
+	/** Compress `d` with the dictionary previously staged via {@link setAux}. */
+	zstdCompressDict(d: Uint8Array, level = 19): Uint8Array {
+		return this.call((l) => this.m._zk_zstd_compress_dict(l, level), d);
+	}
+	/** Decompress `d` with the dictionary previously staged via {@link setAux}. */
+	zstdDecompressDict(d: Uint8Array): Uint8Array {
+		return this.call((l) => this.m._zk_zstd_decompress_dict(l), d);
 	}
 
 	/** bzip2 — Burrows–Wheeler transform. */

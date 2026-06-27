@@ -35,6 +35,8 @@ export {
 	unbrotli,
 	lzma,
 	unlzma,
+	xz,
+	unxz,
 	bzip2,
 	unbzip2,
 	encodeImage,
@@ -56,12 +58,35 @@ export {
 	zip,
 	unzip,
 	listEntries,
+	zipStream,
 	type ZipEntryInput,
 	type ZipEntry,
 	type ZipEntryInfo,
 	type ZipMethod,
-	type UnzipOptions
+	type UnzipOptions,
+	type ZipStreamOptions
 } from './zip/index.js';
+
+// ---- 7z archive helpers ----
+export {
+	sevenZip,
+	unSevenZip,
+	type SevenZipEntryInput,
+	type SevenZipEntry
+} from './sevenzip/index.js';
+
+// ---- Tar archive helpers ----
+export {
+	tar,
+	untar,
+	tarGz,
+	untarGz,
+	tarZstd,
+	untarZstd,
+	type TarEntryInput,
+	type TarEntry,
+	type TarEntryType
+} from './tar/index.js';
 
 // ---- High-level, synchronous class with native dispatch ----
 export { ZipKit, init } from './zipkit.js';
@@ -71,6 +96,30 @@ export { ZipKitEngine, getEngine } from './engine.js';
 
 // ---- String <-> bytes helpers ----
 export { strToU8, strFromU8, DecodeUTF8, EncodeUTF8 } from './string.js';
+
+// ---- Explicit integrity helpers ----
+export { crc32, verifyChecksum } from './checksum.js';
+
+// ---- Zstd dictionary compression ----
+export {
+	trainDictionary,
+	compressWithDictionary,
+	decompressWithDictionary,
+	type TrainOptions
+} from './dictionary.js';
+
+// ---- Delta (incremental) compression for text/JSON ----
+export { compressDelta, applyDelta } from './delta.js';
+
+// ---- File System Access API helpers (browser) ----
+export {
+	entriesFromFileHandles,
+	zipToFileHandle,
+	type FileLike,
+	type ReadableFileHandle,
+	type WritableFileHandle,
+	type FileHandleEntryOptions
+} from './fsa.js';
 
 // ---- Shared types and errors ----
 export type {

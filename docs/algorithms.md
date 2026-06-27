@@ -73,16 +73,22 @@ frame-delta) the engine is the fast portable option.
 | zstd | 1–22 | speed 1, balanced 3, ratio 19 | > 19 enables ultra mode + long-distance matching |
 | brotli | 0–11 | speed 4, balanced 6, ratio 11 | |
 | lzma | 0–9 | speed 3, balanced 6, ratio 9 | |
+| xz | 0–9 | speed 1, balanced 6, ratio 9 | standard `.xz` (LZMA2) |
 | bzip2 | 1–9 | speed 1, balanced 6, ratio 9 | level = block size ×100 kB |
 
 Out-of-range levels are clamped, not rejected.
 
 ## Standard-format compatibility
 
-`gzip`, `deflate`, `zlib`, `zstd`, `snappy`, and `brotli` produce standard,
-interoperable output (verified against Bun/zlib and the system tools). `lz4` uses
-the raw block format (no frame header). `lzma` and `bzip2` are wrapped in a small
-ZipKit length-prefix frame, so decode them with ZipKit (not external tools).
+`gzip`, `deflate`, `zlib`, `zstd`, `snappy`, `brotli`, and `xz` produce standard,
+interoperable output (verified against Bun/zlib, the `xz` CLI, and the system
+tools). `lz4` uses the raw block format (no frame header). `lzma` and `bzip2` are
+wrapped in a small ZipKit length-prefix frame, so decode them with ZipKit (not
+external tools) — for a standard LZMA container that other tools read, use `xz`.
+
+Container formats — **tar** (`zipkit/tar`), **7z** (`zipkit/sevenzip`), and the
+**ZIP** family — interoperate with the Unix `tar`, 7-Zip, and standard ZIP tools
+respectively (including WinZip AES for encrypted ZIPs).
 
 ## Third-party licenses
 
