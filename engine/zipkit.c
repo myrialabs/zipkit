@@ -426,6 +426,14 @@ EMSCRIPTEN_KEEPALIVE void zk_xz_compress(size_t len, int level) {
   CXzProps props;
   XzProps_Init(&props);
   props.lzma2Props.lzmaProps.level = level;
+  // Size the dictionary to the input (next pow2, clamped) instead of LZMA2's
+  // huge level-default (32MB at level 6 → a ~370MB match finder). A dict larger
+  // than the data buys no ratio, and the smaller match finder keeps the Wasm
+  // heap bounded — the engine caps MAXIMUM_MEMORY, so an oversized finder would
+  // otherwise OOM. Mirrors zk_lzma_compress.
+  unsigned dictSize = 1u << 12;
+  while (dictSize < len && dictSize < (1u << 26)) dictSize <<= 1;
+  props.lzma2Props.lzmaProps.dictSize = dictSize;
   props.checkId = XZ_CHECK_CRC32; // CRC32 integrity — no SHA dependency
 
   ensure(&g_out, &g_out_cap, len / 2 + 1024);
