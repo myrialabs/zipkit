@@ -1,6 +1,6 @@
 {
   "name": "zipkit",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "Overkill compression for Node, Bun & the browser — ten codecs (gzip/deflate/zlib/zstd/lz4/snappy/brotli/lzma/bzip2/xz) plus ZIP (streaming + AES), tar, and 7z, in one tiny typed API over a single WebAssembly engine.",
   "type": "module",
   "exports": {
