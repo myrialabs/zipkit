@@ -6,7 +6,7 @@ import * as fflate from 'fflate';
 import lz4 from 'lz4js';
 import pako from 'pako';
 import snappy from 'snappyjs';
-import { compress, decompressWith, getEngine, type Codec, type CompressionMode } from 'zipkit';
+import { compress, decompressWith, getEngine, type Codec, type CompressionMode } from '@myrialabs/zipkit';
 
 interface Scenario {
 	id: string;

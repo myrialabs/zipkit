@@ -10,7 +10,7 @@
  *
  * @example
  * ```ts
- * import { WorkerPool } from 'zipkit/workers';
+ * import { WorkerPool } from '@myrialabs/zipkit/workers';
  * const pool = new WorkerPool();
  * const out = await pool.compress(bytes, 'zstd', { level: 19 });
  * await pool.destroy();

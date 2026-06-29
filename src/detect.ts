@@ -8,7 +8,7 @@
  *   gzip, zlib, zstd.
  * - **Recognized but not auto-decoded here** — ZIP and the standard external
  *   framings (tar, xz, 7z, standard bzip2, the LZ4 *frame*). These need a
- *   dedicated reader (`zipkit/zip`, `zipkit/tar`, …) or an explicit codec, so
+ *   dedicated reader (\`@myrialabs/zipkit/zip\`, \`@myrialabs/zipkit/tar\`, …) or an explicit codec, so
  *   {@link import('./compress.js').decompress} points you at the right API
  *   rather than guessing.
  *

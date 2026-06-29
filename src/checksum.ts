@@ -17,7 +17,7 @@ import { getEngine } from './engine.js';
  *
  * @example
  * ```ts
- * import { crc32 } from 'zipkit';
+ * import { crc32 } from '@myrialabs/zipkit';
  * const sum = await crc32(bytes);
  * const running = await crc32(part2, await crc32(part1));
  * ```

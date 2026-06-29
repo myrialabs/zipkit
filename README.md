@@ -13,7 +13,7 @@
 <p align="center">
   <a href="https://demo.zipkit.myrialabs.dev/">Demo</a> ·
   <a href="https://zipkit.myrialabs.dev/">Website</a> ·
-  <a href="https://www.npmjs.com/package/zipkit">npm</a> ·
+  <a href="https://www.npmjs.com/package/@myrialabs/zipkit">npm</a> ·
   <a href="./docs/api.md">API reference</a> ·
   <a href="./docs/cli.md">CLI reference</a> ·
   <a href="./examples/README.md">Examples</a> ·
@@ -21,7 +21,7 @@
 </p>
 
 <p align="center">
-  <a href="https://www.npmjs.com/package/zipkit"><img src="https://img.shields.io/npm/v/zipkit" alt="npm version" /></a>
+  <a href="https://www.npmjs.com/package/@myrialabs/zipkit"><img src="https://img.shields.io/npm/v/@myrialabs%2Fzipkit" alt="npm version" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT" /></a>
   <img src="https://img.shields.io/badge/runtime-Node%2018%2B%20%7C%20Bun%20%7C%20Browser-black" alt="Node 18+, Bun and Browser" />
 </p>
@@ -34,7 +34,7 @@ small TypeScript API. The default path is adaptive: native speed where the runti
 wins, the portable engine where it wins, and libdeflate density when ratio matters.
 
 ```ts
-import { gzip, gunzip, zstd, unzstd, zip, unzip, compress, decompress } from 'zipkit';
+import { gzip, gunzip, zstd, unzstd, zip, unzip, compress, decompress } from '@myrialabs/zipkit';
 
 const gz = await gzip(bytes);              // balanced default
 const back = await gunzip(gz);
@@ -76,8 +76,8 @@ zipkit zip site.zip index.html app.js --method zstd
 ## Install
 
 ```sh
-bun add zipkit          # or: npm i zipkit / pnpm add zipkit
-bun add -g zipkit       # CLI
+bun add @myrialabs/zipkit          # or: npm i @myrialabs/zipkit / pnpm add @myrialabs/zipkit
+bun add -g @myrialabs/zipkit       # CLI
 ```
 
 ## Quick start
@@ -93,8 +93,8 @@ bun add -g zipkit       # CLI
 | ZIP archive | `await zip([{ name, data }])` · `await unzip(archive)` |
 | Encrypted ZIP | `await zip(entries, { password })` · `await unzip(a, { password })` |
 | Streaming ZIP | `zipStream(entries).pipeTo(dest)` |
-| tar / tarball | `tar(entries)` · `await tarGz(entries)` (`zipkit/tar`) |
-| 7z | `await sevenZip(entries)` · `await unSevenZip(a)` (`zipkit/sevenzip`) |
+| tar / tarball | `tar(entries)` · `await tarGz(entries)` (`@myrialabs/zipkit/tar`) |
+| 7z | `await sevenZip(entries)` · `await unSevenZip(a)` (`@myrialabs/zipkit/sevenzip`) |
 | xz | `await xz(bytes)` · `await unxz(bytes)` |
 | Dictionary / delta | `compressWithDictionary` · `compressDelta` |
 | Stream codec | `readable.pipeThrough(compressionStream('gzip'))` |
@@ -111,7 +111,7 @@ bun add -g zipkit       # CLI
 shared engine the first time it's called.
 
 ```ts
-import { brotli, unbrotli } from 'zipkit';
+import { brotli, unbrotli } from '@myrialabs/zipkit';
 const c = await brotli(bytes, { mode: 'ratio' });
 ```
 
@@ -120,7 +120,7 @@ synchronously. It accepts the same `mode` option as the async helpers while stil
 supporting the old numeric level argument (`zk.gzip(bytes, 6)`).
 
 ```ts
-import { ZipKit } from 'zipkit';
+import { ZipKit } from '@myrialabs/zipkit';
 const zk = await ZipKit.load();
 const gz = zk.gzip(bytes, { mode: 'speed' }); // sync
 const smallest = zk.pack(bytes); // tries brotli/lzma/bzip2/zstd-max, keeps the smallest
@@ -193,7 +193,7 @@ the platform's native `CompressionStream` (true incremental streaming); the rest
 buffer and compress on flush.
 
 ```ts
-import { compressionStream } from 'zipkit/streams';
+import { compressionStream } from '@myrialabs/zipkit/streams';
 
 await fetch(url)
   .then((r) => r.body!)
@@ -203,7 +203,7 @@ await fetch(url)
 ## ZIP archives
 
 ```ts
-import { zip, unzip } from 'zipkit';
+import { zip, unzip } from '@myrialabs/zipkit';
 
 const archive = await zip([
   { name: 'index.html', data: html },
@@ -225,16 +225,16 @@ buffers the whole archive), and **integrity-checked**:
 const enc = await zip(entries, { password: 'secret' });   // AES-256 (AE-2)
 const out = await unzip(enc, { password: 'secret', verify: true });
 
-import { zipStream } from 'zipkit/zip';
+import { zipStream } from '@myrialabs/zipkit/zip';
 await zipStream(entries).pipeTo(destination);             // memory-bounded
 ```
 
 ## tar, 7z & xz
 
 ```ts
-import { tar, tarGz, untarGz } from 'zipkit/tar';
-import { sevenZip, unSevenZip } from 'zipkit/sevenzip';
-import { xz, unxz } from 'zipkit/xz';
+import { tar, tarGz, untarGz } from '@myrialabs/zipkit/tar';
+import { sevenZip, unSevenZip } from '@myrialabs/zipkit/sevenzip';
+import { xz, unxz } from '@myrialabs/zipkit/xz';
 
 const tgz = await tarGz([{ name: 'a.txt', data }]);        // .tar.gz (also tarZstd)
 const archive = await sevenZip([{ name: 'a.txt', data }]); // 7-Zip-compatible
@@ -248,8 +248,8 @@ streaming `.xz` container.
 ## Dictionary & delta
 
 ```ts
-import { trainDictionary, compressWithDictionary } from 'zipkit/dictionary';
-import { compressDelta, applyDelta } from 'zipkit/delta';
+import { trainDictionary, compressWithDictionary } from '@myrialabs/zipkit/dictionary';
+import { compressDelta, applyDelta } from '@myrialabs/zipkit/delta';
 
 const dict = await trainDictionary(samples);          // many small similar payloads
 const small = await compressWithDictionary(record, dict);
@@ -265,7 +265,7 @@ const restored = await applyDelta(prevRevision, patch);
 
 ```ts
 import { Elysia } from 'elysia';
-import { elysia as compression } from 'zipkit/middleware';
+import { elysia as compression } from '@myrialabs/zipkit/middleware';
 
 new Elysia()
   .onAfterHandle(compression())
@@ -275,7 +275,7 @@ new Elysia()
 
 ```ts
 import express from 'express';
-import { express as compression } from 'zipkit/middleware';
+import { express as compression } from '@myrialabs/zipkit/middleware';
 
 const app = express();
 app.use(compression());
@@ -285,7 +285,7 @@ app.listen(3000);
 
 ```ts
 import { Hono } from 'hono';
-import { hono as compression } from 'zipkit/middleware';
+import { hono as compression } from '@myrialabs/zipkit/middleware';
 
 const app = new Hono();
 app.use('*', compression());
@@ -298,8 +298,8 @@ and Rollup resolve as an asset out of the box. See [docs/browser.md](./docs/brow
 
 The combined engine is ~1.4 MB of `.wasm` (every codec in one module), loaded
 once and cached. Keep it off your initial bundle with a dynamic import
-(`const { gzip } = await import('zipkit')`), or skip the engine entirely for
-gzip/zlib/deflate by using [`zipkit/streams`](./docs/streaming.md), which run on
+(`const { gzip } = await import('@myrialabs/zipkit')`), or skip the engine entirely for
+gzip/zlib/deflate by using [`@myrialabs/zipkit/streams`](./docs/streaming.md), which run on
 the browser's native `CompressionStream`. Per-codec Wasm splitting is on the
 roadmap.
 

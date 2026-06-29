@@ -12,7 +12,7 @@
  *
  * @example
  * ```ts
- * import { compressDelta, applyDelta } from 'zipkit';
+ * import { compressDelta, applyDelta } from '@myrialabs/zipkit';
  * const v1 = strToU8(JSON.stringify(stateV1));
  * const patch = await compressDelta(v1, strToU8(JSON.stringify(stateV2)));
  * const v2 = await applyDelta(v1, patch); // === bytes of stateV2

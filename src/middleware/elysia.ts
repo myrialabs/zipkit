@@ -5,7 +5,7 @@
  * @example
  * ```ts
  * import { Elysia } from 'elysia';
- * import { elysia as compression } from 'zipkit/middleware';
+ * import { elysia as compression } from '@myrialabs/zipkit/middleware';
  * const app = new Elysia().onAfterHandle(compression()).get('/', () => bigJson);
  * ```
  */

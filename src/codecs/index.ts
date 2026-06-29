@@ -1,6 +1,6 @@
 /**
  * All codec façades, re-exported. Import individual codecs from the package
- * root (`import { gzip } from 'zipkit'`) for tree-shaking, or grab the whole
+ * root (`import { gzip } from '@myrialabs/zipkit'`) for tree-shaking, or grab the whole
  * set here.
  */
 export { gzip, gunzip } from './gzip.js';

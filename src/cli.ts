@@ -4,7 +4,7 @@
  * zipkit CLI
  *
  * A thin command line over the library, so ZipKit can be used straight from a
- * terminal (`npm i -g zipkit` / `bun add -g zipkit`).
+ * terminal (`npm i -g @myrialabs/zipkit` / `bun add -g @myrialabs/zipkit`).
  *
  *   zipkit compress <file> [--codec zstd] [--mode ratio] [--level N] [-o out]
  *   zipkit decompress <file> [--codec gzip] [-o out]   (auto-detects by default)

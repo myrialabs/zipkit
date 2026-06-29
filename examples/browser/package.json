@@ -14,7 +14,7 @@
 		"lz4js": "^0.2.0",
 		"pako": "^2.1.0",
 		"snappyjs": "^0.7.0",
-		"zipkit": "file:../.."
+		"@myrialabs/zipkit": "file:../.."
 	},
 	"devDependencies": {
 		"vite": "^5.0.0"

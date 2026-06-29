@@ -13,7 +13,7 @@
  *
  * @example
  * ```ts
- * import { zip, unzip } from 'zipkit/zip';
+ * import { zip, unzip } from '@myrialabs/zipkit/zip';
  * const archive = await zip([
  *   { name: 'hello.txt', data: strToU8('hi') },
  *   { name: 'data.json', data: bytes, method: 'zstd' }

@@ -1,11 +1,11 @@
 # Streaming
 
-`zipkit/streams` provides web-standard `TransformStream`s for every codec, so
+`@myrialabs/zipkit/streams` provides web-standard `TransformStream`s for every codec, so
 ZipKit drops into any `pipeThrough()` / `pipeTo()` pipeline — `fetch` bodies,
 files, sockets, anything that speaks Web Streams (Node 18+, Bun, browsers).
 
 ```ts
-import { compressionStream, decompressionStream } from 'zipkit/streams';
+import { compressionStream, decompressionStream } from '@myrialabs/zipkit/streams';
 
 compressionStream(codec, opts?): TransformStream<Uint8Array, Uint8Array>
 decompressionStream(codec, opts?): TransformStream<Uint8Array, Uint8Array>
@@ -33,7 +33,7 @@ incremental. **For unbounded streams, prefer gzip / zlib / deflate.**
 Compress a fetch response to a file:
 
 ```ts
-import { compressionStream } from 'zipkit/streams';
+import { compressionStream } from '@myrialabs/zipkit/streams';
 
 const res = await fetch('https://example.com/big.json');
 await res.body!
@@ -44,7 +44,7 @@ await res.body!
 Decompress while reading:
 
 ```ts
-import { decompressionStream } from 'zipkit/streams';
+import { decompressionStream } from '@myrialabs/zipkit/streams';
 
 const text = await new Response(
   Bun.file('big.json.gz').stream().pipeThrough(decompressionStream('gzip'))
@@ -69,7 +69,7 @@ decompressor (`zlib`, `Bun.gunzipSync`, browser `DecompressionStream`, etc.).
 For text streams, pair with the streaming string helpers:
 
 ```ts
-import { EncodeUTF8, DecodeUTF8 } from 'zipkit';
+import { EncodeUTF8, DecodeUTF8 } from '@myrialabs/zipkit';
 ```
 
 `DecodeUTF8` correctly reassembles multi-byte code points split across chunks.

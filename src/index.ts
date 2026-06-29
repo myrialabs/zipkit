@@ -8,7 +8,7 @@
  *
  * @example
  * ```ts
- * import { gzip, gunzip, zstd, compress, decompress } from 'zipkit';
+ * import { gzip, gunzip, zstd, compress, decompress } from '@myrialabs/zipkit';
  *
  * const gz = await gzip(bytes);            // named codec, async, lazy-loads the engine
  * const back = await gunzip(gz);

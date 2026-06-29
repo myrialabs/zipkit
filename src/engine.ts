@@ -13,7 +13,7 @@
  *
  * @example
  * ```ts
- * import { ZipKitEngine } from 'zipkit/engine';
+ * import { ZipKitEngine } from '@myrialabs/zipkit/engine';
  * const engine = await ZipKitEngine.load();
  * const packed = engine.zstdCompress(bytes, 19);
  * ```

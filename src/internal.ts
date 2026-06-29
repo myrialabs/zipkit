@@ -39,7 +39,7 @@ export function throwIfAborted(signal?: AbortSignal): void {
  * Run a synchronous codec on the engine inside a Promise, honoring an
  * `AbortSignal` at entry and reporting trivial start/finish progress. The
  * engine itself is one-shot and cannot yield mid-call; for genuinely
- * off-thread work use `zipkit/workers`.
+ * off-thread work use \`@myrialabs/zipkit/workers\`.
  */
 export async function runAsync(
 	work: () => Uint8Array,

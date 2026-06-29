@@ -6,7 +6,7 @@
  * @example
  * ```ts
  * import { Hono } from 'hono';
- * import { hono as compress } from 'zipkit/middleware';
+ * import { hono as compress } from '@myrialabs/zipkit/middleware';
  * const app = new Hono();
  * app.use('*', compress());
  * ```

@@ -6,7 +6,7 @@
  * @example
  * ```ts
  * import express from 'express';
- * import { express as compression } from 'zipkit/middleware';
+ * import { express as compression } from '@myrialabs/zipkit/middleware';
  * const app = express();
  * app.use(compression());
  * ```

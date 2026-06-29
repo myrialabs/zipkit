@@ -1,7 +1,7 @@
 # CLI reference
 
 ```sh
-bun add -g zipkit      # or: npm i -g zipkit
+bun add -g @myrialabs/zipkit      # or: npm i -g @myrialabs/zipkit
 zipkit help
 ```
 

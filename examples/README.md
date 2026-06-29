@@ -32,7 +32,7 @@ bun run examples/<file>.ts
 ## Notes
 
 - The Node/Bun examples import from `../src/index.js`, so they run straight from a
-  clone. In your own project, import from `'zipkit'` instead.
+  clone. In your own project, import from `'@myrialabs/zipkit'` instead.
 - `middleware-elysia.ts` needs `bun add elysia`.
 - `middleware-express.ts` needs `bun add express`.
 - `middleware-hono.ts` needs `bun add hono`.

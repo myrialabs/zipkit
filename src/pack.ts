@@ -64,7 +64,7 @@ export function unpackSync(engine: ZipKitEngine, data: Uint8Array): Uint8Array {
  *
  * @example
  * ```ts
- * import { pack, unpack } from 'zipkit';
+ * import { pack, unpack } from '@myrialabs/zipkit';
  * const small = await pack(bytes);
  * const orig = await unpack(small);
  * ```

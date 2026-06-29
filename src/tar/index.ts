@@ -14,7 +14,7 @@
  *
  * @example
  * ```ts
- * import { tar, untar, tarGz } from 'zipkit/tar';
+ * import { tar, untar, tarGz } from '@myrialabs/zipkit/tar';
  * const archive = tar([
  *   { name: 'hello.txt', data: strToU8('hi') },
  *   { name: 'src/', type: 'directory' }

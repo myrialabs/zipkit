@@ -11,7 +11,7 @@
  *
  * @example
  * ```ts
- * import { trainDictionary, compressWithDictionary, decompressWithDictionary } from 'zipkit';
+ * import { trainDictionary, compressWithDictionary, decompressWithDictionary } from '@myrialabs/zipkit';
  * const dict = await trainDictionary(logLines);          // Uint8Array[]
  * const packed = await compressWithDictionary(oneLine, dict);
  * const back = await decompressWithDictionary(packed, dict);
