@@ -99,8 +99,8 @@ jobs:
         run: |
           bun install
           bun run build
-          npm pack
-          tar -tf zipkit-*.tgz | grep -E 'engine/dist/zipkit-engine.wasm|dist/index.js' || (echo "tarball missing required files" && exit 1)
+          PACKAGE=$(npm pack)
+          tar -tf "$PACKAGE" | grep -E 'engine/dist/zipkit-engine.wasm|dist/index.js' || (echo "tarball missing required files" && exit 1)
           echo "Tarball contents verified."
 
   build-engine:
