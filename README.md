@@ -170,6 +170,8 @@ Representative — **E-commerce API**, ~97 KB JSON (throughput, higher is faster
 | | ZipKit | 3.8% | 18 MB/s | 423 MB/s |
 | **bzip2** | | | | |
 | | ZipKit | 3.4% | 17 MB/s | 83 MB/s |
+| **xz** | | | | |
+| | ZipKit | 3.8% | 16 MB/s | 367 MB/s |
 
 What the full run adds beyond this table:
 

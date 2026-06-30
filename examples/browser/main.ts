@@ -6,7 +6,7 @@ import * as fflate from 'fflate';
 import lz4 from 'lz4js';
 import pako from 'pako';
 import snappy from 'snappyjs';
-import { compress, decompressWith, getEngine, type Codec, type CompressionMode } from '@myrialabs/zipkit';
+import { compress, decompressWith, getEngine, xz, unxz, type Codec, type CompressionMode } from '@myrialabs/zipkit';
 
 interface Scenario {
 	id: string;
@@ -38,7 +38,7 @@ interface Candidate {
 	decompress: (data: Uint8Array) => Promise<Uint8Array>;
 }
 
-const codecs: Codec[] = ['gzip', 'deflate', 'zlib', 'zstd', 'lz4', 'snappy', 'brotli', 'lzma', 'bzip2'];
+const codecs: (Codec | 'xz')[] = ['gzip', 'deflate', 'zlib', 'zstd', 'lz4', 'snappy', 'brotli', 'lzma', 'bzip2', 'xz'];
 const utf8 = new TextEncoder();
 const zstdReady = zstdWasm.init(zstdWasmUrl);
 const brotliModule = brotliInit(brotliWasmUrl).then(() => brotliWasm);
@@ -386,16 +386,18 @@ function renderCodecs(): void {
 	}
 }
 
-function candidatesFor(codec: Codec): Candidate[] {
-	const candidates: Candidate[] = [
-		{
-			codec,
-			implementation: 'ZipKit',
-			zipkit: true,
-			compress: async (data, mode) => compress(data, codec, { mode }),
-			decompress: async (data) => decompressWith(data, codec),
-		}
-	];
+function candidatesFor(codec: Codec | 'xz'): Candidate[] {
+	const candidates: Candidate[] = codec !== 'xz'
+		? [
+			{
+				codec,
+				implementation: 'ZipKit',
+				zipkit: true,
+				compress: async (data, mode) => compress(data, codec, { mode }),
+				decompress: async (data) => decompressWith(data, codec),
+			}
+		]
+		: [];
 
 	if (codec === 'gzip') {
 		candidates.push(
@@ -488,6 +490,16 @@ function candidatesFor(codec: Codec): Candidate[] {
 				const brotli = await brotliModule;
 				return brotli.decompress(data);
 			},
+		});
+	}
+
+	if (codec === 'xz') {
+		candidates.push({
+			codec: 'xz' as Codec,
+			implementation: 'ZipKit',
+			zipkit: true,
+			compress: async (data) => xz(data),
+			decompress: async (data) => unxz(data),
 		});
 	}
 
