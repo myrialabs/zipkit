@@ -84,7 +84,7 @@ type ContainerFormat = Exclude<DetectedFormat, 'gzip' | 'zlib' | 'zstd' | 'xz'>;
 
 /** Guidance for formats {@link decompress} recognizes but can't decode itself. */
 const CONTAINER_HINT: Record<ContainerFormat, string> = {
-	zip: 'Input is a ZIP archive — use unzip() from @myrialabs/zipkit/zip (or the \`zipkit unzip\` CLI command).',
+	zip: 'Input is a ZIP archive — use unzip() from @myrialabs/zipkit/zip (or the `zipkit unzip` CLI command).',
 	tar: 'Input is a tar archive — use untar() from @myrialabs/zipkit/tar (or untarGz/untarZstd for compressed tarballs).',
 	'7z': 'Input is a 7z archive — use unSevenZip() from @myrialabs/zipkit/sevenzip.',
 	bzip2:
