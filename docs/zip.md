@@ -1,6 +1,6 @@
 # ZIP archives
 
-`@myrialabs/zipkit/zip` reads and writes standard ZIP archives, with an optional zstd method
+`@myrialabs/zipkit` reads and writes standard ZIP archives, with an optional zstd method
 for much denser archives between ZipKit-aware peers.
 
 ```ts
@@ -88,7 +88,7 @@ For archives too large to hold in memory, `zipStream()` emits the archive
 incrementally through a `ReadableStream<Uint8Array>` — peak memory is one entry:
 
 ```ts
-import { zipStream } from '@myrialabs/zipkit/zip';
+import { zipStream } from '@myrialabs/zipkit';
 await zipStream(entriesIterable).pipeTo(destinationWritable);
 ```
 

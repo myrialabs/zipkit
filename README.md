@@ -93,8 +93,8 @@ bun add -g @myrialabs/zipkit       # CLI
 | ZIP archive | `await zip([{ name, data }])` · `await unzip(archive)` |
 | Encrypted ZIP | `await zip(entries, { password })` · `await unzip(a, { password })` |
 | Streaming ZIP | `zipStream(entries).pipeTo(dest)` |
-| tar / tarball | `tar(entries)` · `await tarGz(entries)` (`@myrialabs/zipkit/tar`) |
-| 7z | `await sevenZip(entries)` · `await unSevenZip(a)` (`@myrialabs/zipkit/sevenzip`) |
+| tar / tarball | `tar(entries)` · `await tarGz(entries)` (`@myrialabs/zipkit`) |
+| 7z | `await sevenZip(entries)` · `await unSevenZip(a)` (`@myrialabs/zipkit`) |
 | xz | `await xz(bytes)` · `await unxz(bytes)` |
 | Dictionary / delta | `compressWithDictionary` · `compressDelta` |
 | Stream codec | `readable.pipeThrough(compressionStream('gzip'))` |
@@ -195,7 +195,7 @@ the platform's native `CompressionStream` (true incremental streaming); the rest
 buffer and compress on flush.
 
 ```ts
-import { compressionStream } from '@myrialabs/zipkit/streams';
+import { compressionStream } from '@myrialabs/zipkit';
 
 await fetch(url)
   .then((r) => r.body!)
@@ -227,16 +227,16 @@ buffers the whole archive), and **integrity-checked**:
 const enc = await zip(entries, { password: 'secret' });   // AES-256 (AE-2)
 const out = await unzip(enc, { password: 'secret', verify: true });
 
-import { zipStream } from '@myrialabs/zipkit/zip';
+import { zipStream } from '@myrialabs/zipkit';
 await zipStream(entries).pipeTo(destination);             // memory-bounded
 ```
 
 ## tar, 7z & xz
 
 ```ts
-import { tar, tarGz, untarGz } from '@myrialabs/zipkit/tar';
-import { sevenZip, unSevenZip } from '@myrialabs/zipkit/sevenzip';
-import { xz, unxz } from '@myrialabs/zipkit/xz';
+import { tar, tarGz, untarGz } from '@myrialabs/zipkit';
+import { sevenZip, unSevenZip } from '@myrialabs/zipkit';
+import { xz, unxz } from '@myrialabs/zipkit';
 
 const tgz = await tarGz([{ name: 'a.txt', data }]);        // .tar.gz (also tarZstd)
 const archive = await sevenZip([{ name: 'a.txt', data }]); // 7-Zip-compatible
@@ -247,11 +247,39 @@ tar is POSIX `ustar`+PAX (Unix-`tar`/Docker compatible); 7z reads/writes
 copy/LZMA(2) and interoperates with 7-Zip both directions; xz is the full
 streaming `.xz` container.
 
+## Extract any archive (streaming)
+
+`extractStream` reads **every container** — ZIP, tar (`.tar`/`.tar.gz`/`.tar.zst`),
+7z, and lone compressed streams — behind one API, auto-detecting the format from
+its magic bytes. It yields one entry chunk at a time, so you can write each entry
+straight to disk without ever holding the whole archive decompressed in memory:
+
+```ts
+import { extractStream } from '@myrialabs/zipkit';
+
+for await (const { info, chunk, done } of extractStream(bytes, {
+  maxTotalBytes: 512 * 1024 * 1024,   // reject zip bombs past this decompressed size
+  password: 'secret',                 // for encrypted ZIP entries
+  signal: controller.signal
+})) {
+  if (info.type === 'directory') { await mkdir(info.name, { recursive: true }); continue; }
+  await appendToFile(info.name, chunk);
+}
+```
+
+`maxTotalBytes` caps the running total of *actually decompressed* bytes. For the
+streamable path (ZIP `store`/`deflate`, gzip, plain tar) the cap is enforced
+*during* decompression via the platform's incremental `DecompressionStream`, so a
+bomb is rejected before it can allocate past the cap; the one-shot codecs (zstd,
+xz, bzip2, 7z) get a best-effort pre/post-decode check. Path safety (rejecting
+`../` and absolute names) stays with you — `extractStream` only decodes bytes, it
+never touches the filesystem.
+
 ## Dictionary & delta
 
 ```ts
-import { trainDictionary, compressWithDictionary } from '@myrialabs/zipkit/dictionary';
-import { compressDelta, applyDelta } from '@myrialabs/zipkit/delta';
+import { trainDictionary, compressWithDictionary } from '@myrialabs/zipkit';
+import { compressDelta, applyDelta } from '@myrialabs/zipkit';
 
 const dict = await trainDictionary(samples);          // many small similar payloads
 const small = await compressWithDictionary(record, dict);
@@ -267,7 +295,7 @@ const restored = await applyDelta(prevRevision, patch);
 
 ```ts
 import { Elysia } from 'elysia';
-import { elysia as compression } from '@myrialabs/zipkit/middleware';
+import { elysia as compression } from '@myrialabs/zipkit';
 
 new Elysia()
   .onAfterHandle(compression())
@@ -277,7 +305,7 @@ new Elysia()
 
 ```ts
 import express from 'express';
-import { express as compression } from '@myrialabs/zipkit/middleware';
+import { express as compression } from '@myrialabs/zipkit';
 
 const app = express();
 app.use(compression());
@@ -287,7 +315,7 @@ app.listen(3000);
 
 ```ts
 import { Hono } from 'hono';
-import { hono as compression } from '@myrialabs/zipkit/middleware';
+import { hono as compression } from '@myrialabs/zipkit';
 
 const app = new Hono();
 app.use('*', compression());
@@ -301,7 +329,7 @@ and Rollup resolve as an asset out of the box. See [docs/browser.md](./docs/brow
 The combined engine is ~1.4 MB of `.wasm` (every codec in one module), loaded
 once and cached. Keep it off your initial bundle with a dynamic import
 (`const { gzip } = await import('@myrialabs/zipkit')`), or skip the engine entirely for
-gzip/zlib/deflate by using [`@myrialabs/zipkit/streams`](./docs/streaming.md), which run on
+gzip/zlib/deflate by using [`@myrialabs/zipkit`](./docs/streaming.md), which run on
 the browser's native `CompressionStream`. Per-codec Wasm splitting is on the
 roadmap.
 

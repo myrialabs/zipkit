@@ -16,7 +16,7 @@
  *
  * @example
  * ```ts
- * import { zipStream } from '@myrialabs/zipkit/zip';
+ * import { zipStream } from '@myrialabs/zipkit';
  * const stream = zipStream(async function* () {
  *   for await (const file of files) yield { name: file.name, data: await file.bytes() };
  * }());

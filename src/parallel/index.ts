@@ -16,7 +16,7 @@
  *
  * @example
  * ```ts
- * import { compressParallel, decompressParallel } from '@myrialabs/zipkit/parallel';
+ * import { compressParallel, decompressParallel } from '@myrialabs/zipkit';
  * const packed = await compressParallel(bigBuffer, 'zstd', { level: 19 });
  * const original = await decompressParallel(packed);
  * ```

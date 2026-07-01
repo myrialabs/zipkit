@@ -12,7 +12,7 @@
  *
  * @example
  * ```ts
- * import { compressionStream } from '@myrialabs/zipkit/streams';
+ * import { compressionStream } from '@myrialabs/zipkit';
  * await response.body
  *   .pipeThrough(compressionStream('gzip'))
  *   .pipeTo(writable);

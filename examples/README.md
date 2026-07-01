@@ -16,6 +16,7 @@ bun run examples/<file>.ts
 | [`zip-archive.ts`](./zip-archive.ts) | Build & read a ZIP (mixed methods, metadata, filter) |
 | [`zip-streaming.ts`](./zip-streaming.ts) | `zipStream()` — stream a ZIP to disk, memory-bounded |
 | [`zip-encrypted.ts`](./zip-encrypted.ts) | Password-protected ZIP (WinZip AES-256) |
+| [`extract-stream.ts`](./extract-stream.ts) | `extractStream()` — read any archive (ZIP/tar/7z/…) with a zip-bomb cap |
 | [`tar-archive.ts`](./tar-archive.ts) | tar / `.tar.gz` / `.tar.zst` build & read |
 | [`sevenzip-archive.ts`](./sevenzip-archive.ts) | Build & read a `.7z` archive (LZMA) |
 | [`xz-codec.ts`](./xz-codec.ts) | Standard `.xz` (LZMA2) + auto-detect |

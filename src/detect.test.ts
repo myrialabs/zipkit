@@ -39,7 +39,7 @@ test('detects external container formats from their magic', () => {
 test('decompress() routes recognized containers to the right API', async () => {
 	const tarHeader = new Uint8Array(512);
 	tarHeader.set([0x75, 0x73, 0x74, 0x61, 0x72], 257);
-	expect(decompress(tarHeader)).rejects.toThrow(/zipkit\/tar/);
+	expect(decompress(tarHeader)).rejects.toThrow(/untar\(\)/);
 	expect(decompress(new Uint8Array([0xfd, 0x37, 0x7a, 0x58, 0x5a, 0x00]))).rejects.toThrow(/xz/);
 });
 

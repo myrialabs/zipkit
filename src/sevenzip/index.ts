@@ -10,7 +10,7 @@
  *
  * @example
  * ```ts
- * import { sevenZip, unSevenZip } from '@myrialabs/zipkit/sevenzip';
+ * import { sevenZip, unSevenZip } from '@myrialabs/zipkit';
  * const archive = await sevenZip([{ name: 'a.txt', data: strToU8('hi') }]);
  * const files = await unSevenZip(archive);
  * ```

@@ -4,7 +4,7 @@
  * supports (brotli → zstd → gzip → deflate).
  *
  * ```ts
- * import { elysia, express, hono } from '@myrialabs/zipkit/middleware';
+ * import { elysia, express, hono } from '@myrialabs/zipkit';
  * ```
  */
 export { elysia } from './elysia.js';

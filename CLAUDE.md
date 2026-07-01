@@ -13,8 +13,12 @@ engine and exposes one typed API:
 - Named async codec functions (`gzip`, `zstd`, `brotli`, …) — tree-shakeable.
 - A synchronous `ZipKit` class with hybrid native dispatch (native gzip/zstd on
   Bun, the Wasm engine everywhere else).
-- A ZIP container (`@myrialabs/zipkit/zip`), web-standard streams (`@myrialabs/zipkit/streams`), a
-  worker pool (`@myrialabs/zipkit/workers`), and HTTP middleware (`@myrialabs/zipkit/middleware`).
+- A ZIP container, tar/7z readers, streaming `extractStream`, web-standard
+  streams, a worker pool, and HTTP middleware.
+
+The package exposes a **single entry point** — everything is exported from
+`@myrialabs/zipkit` (root barrel). There are no subpath exports; `src/index.ts`
+re-exports every public symbol, and tree-shaking keeps bundles lean.
 
 The package ships ESM (`NodeNext`) from `src/` to `dist/`, exports the API from
 `src/index.ts`, and exposes the `zipkit` command through `dist/cli.js`. The Wasm

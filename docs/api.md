@@ -1,9 +1,9 @@
 # API reference
 
-Everything is exported from the package root unless noted. Submodules:
-`@myrialabs/zipkit/engine`, `@myrialabs/zipkit/streams`, `@myrialabs/zipkit/workers`, `@myrialabs/zipkit/zip`,
-`@myrialabs/zipkit/parallel`, `@myrialabs/zipkit/middleware`, `@myrialabs/zipkit/tar`, `@myrialabs/zipkit/sevenzip`,
-`@myrialabs/zipkit/xz`, `@myrialabs/zipkit/dictionary`, `@myrialabs/zipkit/delta`, `@myrialabs/zipkit/fsa`.
+**Single entry point.** Everything — codecs, the `ZipKit` class, the raw engine,
+streams, the worker pool, ZIP/tar/7z, `extractStream`, dictionary/delta, and the
+HTTP middleware — is exported from `@myrialabs/zipkit`. There are no subpath
+imports; tree-shaking keeps only what you use.
 
 All codecs operate on `Uint8Array`. Named codec functions are **async** and lazily
 instantiate the shared Wasm engine on first use; the `ZipKit` class is
@@ -71,8 +71,8 @@ interface DecompressOptions {
 The named codecs are one-shot (the engine can't yield mid-call), so `signal` is
 checked once at entry and `onProgress` fires `0` at the start and `1` on
 completion — not incrementally. For genuinely off-thread work with mid-stream
-cancellation, use [`@myrialabs/zipkit/workers`](#worker-pool--myrialabszipkitworkers) or
-[`@myrialabs/zipkit/parallel`](#parallel--myrialabszipkitparallel).
+cancellation, use [`@myrialabs/zipkit`](#worker-pool--myrialabszipkitworkers) or
+[`@myrialabs/zipkit`](#parallel--myrialabszipkitparallel).
 
 ---
 
@@ -147,12 +147,12 @@ const original = zk.unpack(smallest);
 
 ---
 
-## Raw engine — `@myrialabs/zipkit/engine`
+## Raw engine
 
 The low-level escape hatch: every codec as a synchronous method, no runtime dispatch.
 
 ```ts
-import { ZipKitEngine, getEngine } from '@myrialabs/zipkit/engine';
+import { ZipKitEngine, getEngine } from '@myrialabs/zipkit';
 
 const engine = await getEngine();         // process-wide singleton (recommended)
 const engine2 = await ZipKitEngine.load(); // fresh instance
@@ -180,7 +180,7 @@ dec.push(chunk); dec.end(last);
 
 ---
 
-## Streams — `@myrialabs/zipkit/streams`
+## Streams
 
 ```ts
 compressionStream(codec: Codec, opts?: CompressOptions): TransformStream<Uint8Array, Uint8Array>
@@ -192,10 +192,10 @@ flush. See [streaming.md](./streaming.md).
 
 ---
 
-## Worker pool — `@myrialabs/zipkit/workers`
+## Worker pool
 
 ```ts
-import { WorkerPool, sharedPool } from '@myrialabs/zipkit/workers';
+import { WorkerPool, sharedPool } from '@myrialabs/zipkit';
 
 const pool = new WorkerPool({ size: 4 });   // default: one per CPU (max 8)
 await pool.compress(data, 'zstd', { level: 19, signal });
@@ -210,7 +210,7 @@ Falls back to inline (same-thread) execution where `worker_threads` is unavailab
 
 ---
 
-## Parallel — `@myrialabs/zipkit/parallel`
+## Parallel
 
 Advanced multi-core compression: splits the input into independent blocks,
 compresses them concurrently across the worker pool, and frames them in a
@@ -219,7 +219,7 @@ consumer are ZipKit and large-payload throughput matters more than a plain
 standard stream.
 
 ```ts
-import { compressParallel, decompressParallel, isParallelContainer } from '@myrialabs/zipkit/parallel';
+import { compressParallel, decompressParallel, isParallelContainer } from '@myrialabs/zipkit';
 
 const packed = await compressParallel(data, 'zstd', { level: 19, blockSize, pool, signal, onProgress });
 const original = await decompressParallel(packed, { pool, signal });   // codec read from header
@@ -238,7 +238,7 @@ Inputs up to 4 GB. Falls back to inline (single block) where workers are absent.
 
 ---
 
-## ZIP — root export and `@myrialabs/zipkit/zip`
+## ZIP
 
 See [zip.md](./zip.md) for full detail.
 
@@ -258,11 +258,11 @@ so a parallel archive is byte-identical to a single-threaded one. Set
 
 ---
 
-## Middleware — `@myrialabs/zipkit/middleware`
+## Middleware
 
 ```ts
 import { Elysia } from 'elysia';
-import { elysia as compression } from '@myrialabs/zipkit/middleware';
+import { elysia as compression } from '@myrialabs/zipkit';
 
 new Elysia()
   .onAfterHandle(compression())
@@ -272,7 +272,7 @@ new Elysia()
 
 ```ts
 import express from 'express';
-import { express as compression } from '@myrialabs/zipkit/middleware';
+import { express as compression } from '@myrialabs/zipkit';
 
 const app = express();
 app.use(compression());
@@ -282,7 +282,7 @@ app.listen(3000);
 
 ```ts
 import { Hono } from 'hono';
-import { hono as compression } from '@myrialabs/zipkit/middleware';
+import { hono as compression } from '@myrialabs/zipkit';
 
 const app = new Hono();
 app.use('*', compression());
@@ -296,10 +296,40 @@ Exports: `elysia`, `express`, `hono`, `negotiate`. Each factory accepts
 
 ## Archives & containers
 
-### tar — `@myrialabs/zipkit/tar`
+### `extractStream` — read any archive, memory-bounded
 
 ```ts
-import { tar, untar, tarGz, untarGz, tarZstd, untarZstd } from '@myrialabs/zipkit/tar';
+import { extractStream } from '@myrialabs/zipkit';
+
+for await (const { info, chunk, done } of extractStream(bytes, {
+  format,          // optional; auto-detected from magic bytes otherwise
+  password,        // encrypted ZIP entries (WinZip AES / ZipCrypto)
+  filter,          // (info) => boolean — extract only matching entries
+  maxTotalBytes,   // cap on total decompressed bytes; throws once exceeded
+  signal,          // AbortSignal — throws AbortError between chunks
+  entryName        // name for the single entry of a lone compressed stream
+})) {
+  // info: { name, type: 'file'|'directory'|'symlink', size, mode?, mtime?, linkname? }
+  // chunk: Uint8Array (empty for dirs/symlinks); done: last chunk of this entry
+}
+```
+
+One reader for **every container** — ZIP, tar (`.tar`/`.tar.gz`/`.tar.zst`/`.tar.xz`),
+7z, and lone gzip/zstd/xz/bzip2/lz4 streams. Entries stream one chunk at a time so
+you never hold the whole archive decompressed in memory.
+
+`maxTotalBytes` caps *actually decompressed* bytes. On the streamable path (ZIP
+`store`/`deflate`, gzip, plain tar) the cap is enforced **during** decompression
+via the platform's incremental `DecompressionStream`, rejecting a zip bomb before
+it allocates past the cap; the one-shot codecs (zstd, xz, bzip2, 7z) get a
+best-effort declared-size pre-check plus a post-decode check. Path safety
+(rejecting `../` / absolute names) is the caller's responsibility — `extractStream`
+only decodes bytes.
+
+### tar
+
+```ts
+import { tar, untar, tarGz, untarGz, tarZstd, untarZstd } from '@myrialabs/zipkit';
 const bytes = tar([{ name: 'a.txt', data }, { name: 'dir/', type: 'directory' }]);
 const files = untar(bytes);              // [{ name, data, type, mode, mtime, ... }]
 const gz = await tarGz(entries);         // .tar.gz   (untarGz to read)
@@ -309,30 +339,30 @@ const zst = await tarZstd(entries);      // .tar.zst  (untarZstd to read)
 POSIX `ustar` with PAX extensions for long paths / large entries. Interoperates
 with the Unix `tar` CLI and Docker layers.
 
-### xz — `@myrialabs/zipkit/xz`
+### xz
 
 ```ts
-import { xz, unxz } from '@myrialabs/zipkit/xz';      // also exported from the root
+import { xz, unxz } from '@myrialabs/zipkit';
 const out = await xz(data, { level: 9 });  // standard .xz (LZMA2 + CRC)
 const back = await unxz(out);              // reads xz CLI / .tar.xz too
 ```
 
 Full streaming `.xz` from the 7-Zip SDK; `decompress()` auto-detects it.
 
-### 7z — `@myrialabs/zipkit/sevenzip`
+### 7z
 
 ```ts
-import { sevenZip, unSevenZip } from '@myrialabs/zipkit/sevenzip';
+import { sevenZip, unSevenZip } from '@myrialabs/zipkit';
 const archive = await sevenZip([{ name: 'a.txt', data }]);   // LZMA1 (or method: 'copy')
 const files = await unSevenZip(archive);                     // reads copy / LZMA1 / LZMA2
 ```
 
 Interoperates with 7-Zip both directions, including LZMA-encoded headers.
 
-### Streaming ZIP — `@myrialabs/zipkit/zip`
+### Streaming ZIP
 
 ```ts
-import { zipStream } from '@myrialabs/zipkit/zip';
+import { zipStream } from '@myrialabs/zipkit';
 await zipStream(entriesIterable, { onProgress }).pipeTo(destination);
 ```
 
@@ -346,21 +376,21 @@ const enc = await zip(entries, { password: 'secret' });   // WinZip AES-256 (AE-
 const out = await unzip(enc, { password: 'secret' });     // also reads legacy ZipCrypto
 ```
 
-### Browser File System Access — `@myrialabs/zipkit/fsa`
+### Browser File System Access
 
 ```ts
-import { zipToFileHandle, entriesFromFileHandles } from '@myrialabs/zipkit/fsa';
+import { zipToFileHandle, entriesFromFileHandles } from '@myrialabs/zipkit';
 await zipToFileHandle(saveHandle, entriesFromFileHandles(pickedHandles));
 ```
 
 ## Dictionary & delta
 
 ```ts
-import { trainDictionary, compressWithDictionary, decompressWithDictionary } from '@myrialabs/zipkit/dictionary';
+import { trainDictionary, compressWithDictionary, decompressWithDictionary } from '@myrialabs/zipkit';
 const dict = await trainDictionary(samples);              // many small similar payloads
 const small = await compressWithDictionary(record, dict);
 
-import { compressDelta, applyDelta } from '@myrialabs/zipkit/delta';
+import { compressDelta, applyDelta } from '@myrialabs/zipkit';
 const patch = await compressDelta(baseRevision, newRevision);   // log/JSON/chat deltas
 const restored = await applyDelta(baseRevision, patch);
 ```

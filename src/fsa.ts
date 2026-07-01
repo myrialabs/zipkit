@@ -12,7 +12,7 @@
  *
  * @example
  * ```ts
- * import { zipToFileHandle, entriesFromFileHandles } from '@myrialabs/zipkit/fsa';
+ * import { zipToFileHandle, entriesFromFileHandles } from '@myrialabs/zipkit';
  * const out = await window.showSaveFilePicker({ suggestedName: 'archive.zip' });
  * const picked = await window.showOpenFilePicker({ multiple: true });
  * await zipToFileHandle(out, entriesFromFileHandles(picked, h => h));

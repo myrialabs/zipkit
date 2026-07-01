@@ -75,6 +75,15 @@ export {
 	type SevenZipEntry
 } from './sevenzip/index.js';
 
+// ---- Streaming, memory-bounded extraction across every container ----
+export {
+	extractStream,
+	type ArchiveFormat,
+	type ArchiveEntryInfo,
+	type ArchiveEntryChunk,
+	type ExtractStreamOptions
+} from './extract.js';
+
 // ---- Tar archive helpers ----
 export {
 	tar,
@@ -120,6 +129,24 @@ export {
 	type WritableFileHandle,
 	type FileHandleEntryOptions
 } from './fsa.js';
+
+// ---- Web-standard TransformStream wrappers for every codec ----
+export { compressionStream, decompressionStream } from './streams/index.js';
+
+// ---- Multi-core worker pool ----
+export { WorkerPool, sharedPool, type WorkerPoolOptions } from './workers/index.js';
+
+// ---- Multi-core block compression (ZKP1 container) ----
+export {
+	compressParallel,
+	decompressParallel,
+	isParallelContainer,
+	type ParallelCompressOptions,
+	type ParallelDecompressOptions
+} from './parallel/index.js';
+
+// ---- HTTP compression middleware (Elysia / Express / Hono) ----
+export { elysia, express, hono, negotiate, type CompressionOptions, type Encoding } from './middleware/index.js';
 
 // ---- Shared types and errors ----
 export type {

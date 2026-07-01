@@ -54,7 +54,7 @@ JS bundle. For size-sensitive apps:
 
 - Lazy-load ZipKit only on the route/interaction that needs it
   (`const { gzip } = await import('@myrialabs/zipkit')`).
-- Prefer gzip/zlib/deflate via [`@myrialabs/zipkit/streams`](./streaming.md), which use the
+- Prefer gzip/zlib/deflate via [`@myrialabs/zipkit`](./streaming.md), which use the
   browser's **native** `CompressionStream` and don't touch the Wasm engine at all.
 
 > **Roadmap:** per-codec Wasm splitting (a small `core` module plus lazy
@@ -69,12 +69,12 @@ the engine. See [streaming.md](./streaming.md).
 
 ## File System Access
 
-`@myrialabs/zipkit/fsa` bridges the browser's `FileSystemFileHandle` to the streaming ZIP
+`@myrialabs/zipkit` bridges the browser's `FileSystemFileHandle` to the streaming ZIP
 writer, so you can zip large local files straight to disk without reading them
 all into memory:
 
 ```ts
-import { zipToFileHandle, entriesFromFileHandles } from '@myrialabs/zipkit/fsa';
+import { zipToFileHandle, entriesFromFileHandles } from '@myrialabs/zipkit';
 
 const out = await window.showSaveFilePicker({ suggestedName: 'archive.zip' });
 const picked = await window.showOpenFilePicker({ multiple: true });
@@ -86,7 +86,7 @@ needs real handles at call time, so use it behind a `showSaveFilePicker` check.
 
 ## Workers
 
-`@myrialabs/zipkit/workers` targets Node/Bun `worker_threads`. In the browser it transparently
+`@myrialabs/zipkit` targets Node/Bun `worker_threads`. In the browser it transparently
 falls back to inline (main-thread) execution. To compress off the main thread in a
 browser, run ZipKit inside your own Web Worker.
 

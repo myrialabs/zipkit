@@ -10,54 +10,6 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
-    },
-    "./engine": {
-      "types": "./dist/engine.d.ts",
-      "import": "./dist/engine.js"
-    },
-    "./streams": {
-      "types": "./dist/streams/index.d.ts",
-      "import": "./dist/streams/index.js"
-    },
-    "./workers": {
-      "types": "./dist/workers/index.d.ts",
-      "import": "./dist/workers/index.js"
-    },
-    "./parallel": {
-      "types": "./dist/parallel/index.d.ts",
-      "import": "./dist/parallel/index.js"
-    },
-    "./zip": {
-      "types": "./dist/zip/index.d.ts",
-      "import": "./dist/zip/index.js"
-    },
-    "./tar": {
-      "types": "./dist/tar/index.d.ts",
-      "import": "./dist/tar/index.js"
-    },
-    "./sevenzip": {
-      "types": "./dist/sevenzip/index.d.ts",
-      "import": "./dist/sevenzip/index.js"
-    },
-    "./xz": {
-      "types": "./dist/codecs/xz.d.ts",
-      "import": "./dist/codecs/xz.js"
-    },
-    "./dictionary": {
-      "types": "./dist/dictionary.d.ts",
-      "import": "./dist/dictionary.js"
-    },
-    "./delta": {
-      "types": "./dist/delta.d.ts",
-      "import": "./dist/delta.js"
-    },
-    "./fsa": {
-      "types": "./dist/fsa.d.ts",
-      "import": "./dist/fsa.js"
-    },
-    "./middleware": {
-      "types": "./dist/middleware/index.d.ts",
-      "import": "./dist/middleware/index.js"
     }
   },
   "types": "./dist/index.d.ts",

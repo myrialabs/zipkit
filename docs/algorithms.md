@@ -86,9 +86,9 @@ tools). `lz4` uses the raw block format (no frame header). `lzma` and `bzip2` ar
 wrapped in a small ZipKit length-prefix frame, so decode them with ZipKit (not
 external tools) — for a standard LZMA container that other tools read, use `xz`.
 
-Container formats — **tar** (`@myrialabs/zipkit/tar`), **7z** (`@myrialabs/zipkit/sevenzip`), and the
-**ZIP** family — interoperate with the Unix `tar`, 7-Zip, and standard ZIP tools
-respectively (including WinZip AES for encrypted ZIPs).
+Container formats — **tar**, **7z**, and the **ZIP** family — interoperate with
+the Unix `tar`, 7-Zip, and standard ZIP tools respectively (including WinZip AES
+for encrypted ZIPs).
 
 ## Third-party licenses
 
